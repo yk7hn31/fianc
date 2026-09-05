@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+.vercel
+next-env.d.ts
+playwright-report/
+test-results/
+public/sw*.js
+public/workbox-*.js
