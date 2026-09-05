@@ -226,7 +226,7 @@ transactions. A month switcher in the header drives all of it.
 **Transactions.** Filters for date range, account, category, type, and free
 text over payee and note. Server-side pagination and sorting. Add and edit
 through a `ResponsiveDialog`. Multi-select with bulk delete. Transfer pairs
-render as one row.
+render as one row: editing or deleting one half acts on both.
 
 **Budgets.** One month at a time, one row per expense category: cap, spent,
 remaining bar, and a rollover toggle. Amounts edit inline. A "copy last month"
@@ -266,8 +266,8 @@ layout stretched wide.
 
 ### Desktop (`md` and up)
 
-- The persistent left sidebar from `DESIGN.md`, surface `#fafafa`, with a ⌘K
-  command palette at its top.
+- The persistent left sidebar from `DESIGN.md`, surface `#fafafa`. (The ⌘K
+  command palette that would sit at its top is deferred — see below.)
 - Transactions become a real data table: sortable columns, inline editing,
   keyboard row navigation, multi-select.
 - Forms open in a `Sheet` or `Dialog`; the FAB and bottom bar are gone.
