@@ -6,7 +6,7 @@
 
 **Architecture:** Next.js 15 App Router with server actions as the only mutation path. All business logic lives in pure modules under `lib/` (money parsing, budget rollover) so it is unit-testable without a database; `lib/queries/*` holds the read models and takes `userId` as its first argument. Auth is hand-rolled: argon2id password hashes and opaque session tokens stored hashed in Postgres. The UI is authored mobile-first, with layout differences expressed as CSS breakpoints and only structural swaps (drawer vs dialog, bottom bar vs sidebar) going through a media-query hook.
 
-**Tech Stack:** Next.js 15 (App Router, TypeScript), React 19, Tailwind v4, shadcn/ui, Lucide icons, Supabase Postgres, Drizzle ORM + postgres.js, Zod, Recharts, `@node-rs/argon2`, Vitest, Playwright.
+**Tech Stack:** Next.js 15 (App Router, TypeScript), React 19, Tailwind v4, shadcn/ui, Lucide icons, Neon Postgres, Drizzle ORM + postgres.js, Zod, Recharts, `@node-rs/argon2`, Vitest, Playwright.
 
 **Spec:** `docs/superpowers/specs/2026-09-06-money-app-design.md`
 
@@ -184,11 +184,11 @@ Expected: PASS, 3 tests.
 - [ ] **Step 8: Write `.env.example`**
 
 ```bash
-# Supabase → Project Settings → Database → Connection string
-# Pooled (port 6543, pgbouncer) — used by the app at runtime
-DATABASE_URL="postgresql://postgres.PROJECT:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres"
-# Direct (port 5432) — used by drizzle-kit for schema push only
-DIRECT_URL="postgresql://postgres.PROJECT:PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres"
+# Neon → Project Dashboard → Connection Details
+# Pooled (host contains -pooler) — used by the app at runtime
+DATABASE_URL="postgresql://USER:PASSWORD@ep-NAME-pooler.REGION.aws.neon.tech/fianc?sslmode=require"
+# Direct (no -pooler) — used by drizzle-kit for schema push only
+DIRECT_URL="postgresql://USER:PASSWORD@ep-NAME.REGION.aws.neon.tech/fianc?sslmode=require"
 # Shared secret required to create an account. Any long random string.
 SIGNUP_CODE="change-me"
 ```
@@ -857,8 +857,8 @@ import * as schema from "./schema";
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set");
 
-// `prepare: false` is required: Supabase's pooled port runs pgbouncer in
-// transaction mode, which cannot hold prepared statements between queries.
+// `prepare: false` is required: Neon's pooled endpoint cannot hold prepared
+// statements between queries.
 const client = postgres(url, { prepare: false });
 
 export const db = drizzle(client, { schema });
@@ -884,22 +884,22 @@ export default defineConfig({
 
 Add `import "dotenv/config";` at the top of `drizzle.config.ts` and `npm install -D dotenv`.
 
-- [ ] **Step 7: Push the schema to Supabase**
+- [ ] **Step 7: Push the schema to Neon**
 
-Copy `.env.example` to `.env.local`, fill in the real Supabase values, then:
+Copy `.env.example` to `.env.local`, fill in the real Neon values, then:
 
 ```bash
 cp .env.local .env   # drizzle-kit reads .env
 npm run db:push
 ```
 
-Expected: drizzle-kit reports the eight tables and the enums as created. Verify in the Supabase table editor.
+Expected: drizzle-kit reports the eight tables and the enums as created. Verify in the Neon SQL editor.
 
 - [ ] **Step 8: Commit**
 
 ```bash
 git add -A
-git commit -m "feat: add Drizzle schema and Supabase client"
+git commit -m "feat: add Drizzle schema and Neon client"
 ```
 
 ---

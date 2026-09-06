@@ -2613,7 +2613,7 @@ Expected: every unit test, every e2e spec on desktop and mobile, and the three P
 `README.md` — replace the `create-next-app` boilerplate with:
 
 - What fianc is, in two sentences.
-- Setup: copy `.env.example` to `.env.local`, create a Supabase project, fill in `DATABASE_URL` (pooled, 6543) and `DIRECT_URL` (direct, 5432), set `SIGNUP_CODE`, run `npm install && npm run db:push && npm run dev`.
+- Setup: copy `.env.example` to `.env.local`, create a Neon project, fill in `DATABASE_URL` (pooled) and `DIRECT_URL` (direct), set `SIGNUP_CODE`, run `npm install && npm run db:push && npm run dev`.
 - Scripts table: `dev`, `build`, `db:push`, `test`, `test:e2e`, `test:pwa`, `test:all`.
 - Architecture in one paragraph: server actions only, pure logic in `lib/`, auth is hand-rolled and sized for a couple of users.
 - The three model decisions, one line each, with a pointer to the spec.

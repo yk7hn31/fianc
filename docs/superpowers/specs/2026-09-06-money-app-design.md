@@ -36,7 +36,7 @@ offline mutation queueing. Each is deferred, not rejected.
 |---|---|---|
 | Framework | Next.js 15, App Router, TypeScript | Server actions remove the need for a separate API layer |
 | Styling | Tailwind v4, shadcn/ui, Lucide icons | `DESIGN.md` is written against these tokens |
-| Database | Supabase Postgres via Drizzle + postgres.js | Managed Postgres; Drizzle keeps schema in TypeScript |
+| Database | Neon Postgres via Drizzle + postgres.js | Serverless Postgres; Drizzle keeps schema in TypeScript |
 | Auth | Hand-rolled sessions (see below) | Two known users, invite-free, no external dependency |
 | Validation | Zod | One schema shared by the form and the server action |
 | Charts | Recharts | Composes with the token palette |
@@ -48,8 +48,8 @@ UI**.
 
 ### Database access
 
-The browser never talks to Postgres. There is no `supabase-js` client, no anon
-key, and no Row Level Security. Supabase supplies a managed Postgres instance
+The browser never talks to Postgres. There is no vendor client library, no
+browser-side key, and no Row Level Security. Neon supplies a managed Postgres instance
 and nothing else; every query runs in server code that already scopes by
 `user_id`. RLS would be a second enforcement of a rule the query layer already
 enforces, and a second place for it to be wrong.
