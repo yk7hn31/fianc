@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,12 @@ export function AuthForm({
   action: Action;
 }) {
   const [state, formAction, pending] = useActionState(action, null);
+  // React resets an uncontrolled form after every action cycle, so a rejected
+  // signup code would also wipe the name and email the user typed correctly.
+  // Only these two are held — clearing the password and the code on a failed
+  // attempt is the behaviour we want.
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const fieldError = (k: string) =>
     state && !state.ok ? state.fieldErrors?.[k]?.[0] : undefined;
 
@@ -36,15 +42,23 @@ export function AuthForm({
             : "You need the signup code."}
         </p>
 
-        <form action={formAction} className="space-y-3">
+        <form action={formAction} aria-busy={pending} className="space-y-3">
           {mode === "signup" && (
-            <Field label="Name" name="name" error={fieldError("name")} />
+            <Field
+              label="Name"
+              name="name"
+              value={name}
+              onValueChange={setName}
+              error={fieldError("name")}
+            />
           )}
           <Field
             label="Email"
             name="email"
             type="email"
             autoComplete="email"
+            value={email}
+            onValueChange={setEmail}
             error={fieldError("email")}
           />
           <Field
@@ -92,14 +106,19 @@ function Field({
   name,
   type = "text",
   autoComplete,
+  value,
+  onValueChange,
   error,
 }: {
   label: string;
   name: string;
   type?: string;
   autoComplete?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
   error?: string;
 }) {
+  const errorId = `${name}-error`;
   return (
     <div className="space-y-1.5">
       <Label htmlFor={name}>{label}</Label>
@@ -109,9 +128,19 @@ function Field({
         type={type}
         autoComplete={autoComplete}
         aria-invalid={Boolean(error)}
+        // Without this a screen reader announces the field as invalid but
+        // never reads why — the reason sits in a sibling paragraph.
+        aria-describedby={error ? errorId : undefined}
+        {...(onValueChange
+          ? { value, onChange: (e) => onValueChange(e.target.value) }
+          : {})}
         className="h-11"
       />
-      {error && <p className="text-destructive text-caption">{error}</p>}
+      {error && (
+        <p id={errorId} className="text-destructive text-caption">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

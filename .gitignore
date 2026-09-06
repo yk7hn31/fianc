@@ -19,3 +19,7 @@ public/workbox-*.js
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Playwright
+/test-results
+/playwright-report

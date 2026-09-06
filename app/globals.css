@@ -43,6 +43,15 @@
   --color-border: var(--color-hairline);
   --color-input: var(--color-canvas);
   --color-ring: var(--color-hairline);
+  /*
+   * DESIGN.md specifies the focus treatment as a 1px #e5e5e5 ring, which is
+   * --color-ring above and stays exactly as written. It says nothing about the
+   * 3px halo shadcn paints outside that border, and hairline-on-white leaves
+   * the halo at roughly 1.2:1 — a focus indicator a sighted keyboard user
+   * cannot actually see, against WCAG 2.4.11's 3:1. This token darkens only the
+   * halo; the spec'd 1px border is untouched.
+   */
+  --color-focus-ring: var(--color-ink);
   --color-sidebar: var(--color-surface-alt);
 
   --text-caption: 12px;

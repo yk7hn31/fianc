@@ -20,5 +20,9 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/).*)"],
+  // Exempts /_next and anything that looks like a file (a dot in the last
+  // segment). The original spelled out favicon.ico, manifest.webmanifest and
+  // icons/ one by one, which would have started 302-ing the service worker and
+  // every other public/ asset to /login the moment the PWA work landed.
+  matcher: ["/((?!_next/|.*\\.[^/]+$).*)"],
 };

@@ -29,6 +29,16 @@ const signupInput = credentials.extend({
   code: z.string().min(1, "Enter the signup code"),
 });
 
+/** Postgres unique_violation. postgres.js surfaces the SQLSTATE as `code`. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "23505"
+  );
+}
+
 export async function signup(
   _prev: ActionResult | null,
   formData: FormData,
@@ -43,20 +53,33 @@ export async function signup(
     return fail("That signup code is not valid");
   }
 
-  const [existing] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
-  if (existing) return fail("That email is already registered");
+  // Everything that touches the database is wrapped: an action must resolve to
+  // an ActionResult, never throw across the client boundary. The pre-check and
+  // the unique constraint both exist on purpose — the check gives the good
+  // message on the common path, the constraint catches two signups racing
+  // through the check at once.
+  try {
+    const [existing] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+    if (existing) return fail("That email is already registered");
 
-  const [user] = await db
-    .insert(users)
-    .values({ email, name, passwordHash: await hashPassword(password) })
-    .returning();
+    const [user] = await db
+      .insert(users)
+      .values({ email, name, passwordHash: await hashPassword(password) })
+      .returning();
 
-  await seedDefaultCategories(user.id);
-  await createSession(user.id);
+    await seedDefaultCategories(user.id);
+    await createSession(user.id);
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return fail("That email is already registered");
+    }
+    return fail("Could not create your account. Try again.");
+  }
+
   redirect("/dashboard");
 }
 
@@ -70,19 +93,24 @@ export async function login(
   }
   const { email, password } = parsed.data;
 
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
+  try {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
 
-  // One message for both branches: do not reveal which emails exist.
-  const invalid = fail("Email or password is incorrect");
-  if (!user) return invalid;
-  if (!(await verifyPassword(user.passwordHash, password))) return invalid;
+    // One message for both branches: do not reveal which emails exist.
+    const invalid = fail("Email or password is incorrect");
+    if (!user) return invalid;
+    if (!(await verifyPassword(user.passwordHash, password))) return invalid;
 
-  await purgeExpiredSessions();
-  await createSession(user.id);
+    await purgeExpiredSessions();
+    await createSession(user.id);
+  } catch {
+    return fail("Could not sign you in. Try again.");
+  }
+
   redirect("/dashboard");
 }
 

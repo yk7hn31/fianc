@@ -63,13 +63,22 @@ export const getSession = cache(async (): Promise<{ user: User } | null> => {
       .update(sessions)
       .set({ expiresAt })
       .where(eq(sessions.id, row.session.id));
-    jar.set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      expires: expiresAt,
-    });
+    try {
+      jar.set(SESSION_COOKIE, token, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        expires: expiresAt,
+      });
+    } catch {
+      // Next 15 only allows a cookie write inside a Server Action or Route
+      // Handler, and getSession also runs during plain page renders — where
+      // this throws and turns the whole page into a 500. The row above is the
+      // real session record and has already been extended; the cookie's own
+      // expiry catches up the next time the user submits anything, since every
+      // server action reaches this same code from a context that can write.
+    }
   }
 
   return { user: row.user };
