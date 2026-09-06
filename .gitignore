@@ -16,3 +16,6 @@ test-results/
 public/sw*.js
 public/workbox-*.js
 .neon
+
+# TypeScript incremental build cache
+*.tsbuildinfo
