@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseAmount, formatAmount, directionFor } from "./money";
+import { parseAmount, formatAmount, directionFor, minorUnitExponent } from "./money";
 
 describe("parseAmount", () => {
   it("parses whole numbers to minor units", () => {
@@ -77,5 +77,52 @@ describe("directionFor", () => {
 
   it("defaults a transfer to -1; the paired inflow row overrides it to +1", () => {
     expect(directionFor("transfer")).toBe(-1);
+  });
+});
+
+describe("parseAmount with JPY (0 minor digits)", () => {
+  it("parses whole amounts", () => {
+    expect(parseAmount("1234", "JPY")).toEqual({ ok: true, value: 1234 });
+  });
+
+  it("rejects decimals", () => {
+    expect(parseAmount("12.34", "JPY")).toMatchObject({ ok: false });
+  });
+});
+
+describe("parseAmount with KWD (3 minor digits)", () => {
+  it("accepts three decimal places", () => {
+    expect(parseAmount("12.345", "KWD")).toEqual({ ok: true, value: 12345 });
+  });
+
+  it("rejects four decimal places", () => {
+    expect(parseAmount("12.3456", "KWD")).toMatchObject({ ok: false });
+  });
+});
+
+describe("formatAmount with JPY", () => {
+  it("formats JPY amounts without decimals", () => {
+    expect(formatAmount(1234, "JPY", "en-US")).toBe("¥1,234");
+  });
+});
+
+describe("formatAmount with KWD", () => {
+  it("formats KWD amounts with three decimal places", () => {
+    const result = formatAmount(12345, "KWD", "en-US");
+    expect(result).toMatch(/KWD\s+12\.345/);
+  });
+});
+
+describe("minorUnitExponent", () => {
+  it("returns 2 for USD", () => {
+    expect(minorUnitExponent("USD")).toBe(2);
+  });
+
+  it("returns 0 for JPY", () => {
+    expect(minorUnitExponent("JPY")).toBe(0);
+  });
+
+  it("returns 3 for KWD", () => {
+    expect(minorUnitExponent("KWD")).toBe(3);
   });
 });
