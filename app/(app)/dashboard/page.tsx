@@ -5,7 +5,7 @@ import { monthTotals, spendByCategory, listTransactions, normaliseFilters } from
 import { getBudgetMonth } from "@/lib/queries/budgets";
 import { listActiveAccounts } from "@/lib/queries/accounts";
 import { listCategories } from "@/lib/queries/categories";
-import { monthKey } from "@/lib/budgets";
+import { monthBounds, monthKey } from "@/lib/budgets";
 import { formatAmount } from "@/lib/money";
 import { AppHeader } from "@/components/app-shell/app-header";
 import { MonthSwitcher } from "@/components/month-switcher";
@@ -28,13 +28,17 @@ export default async function DashboardPage({
   const { month: raw } = await searchParams;
   const month = raw && /^\d{4}-\d{2}$/.test(raw) ? raw : monthKey(new Date());
   const currency = user.baseCurrency;
+  // The month switcher drives the Recent list too. Without a range this asked
+  // for the ten most recent transactions overall, so switching to March
+  // rendered March's totals, donut and budgets above today's transactions.
+  const { from, to } = monthBounds(month);
 
   const [totals, byCategory, budgetRows, recent, accounts, categories] =
     await Promise.all([
       monthTotals(user.id, month),
       spendByCategory(user.id, month),
       getBudgetMonth(user.id, month),
-      listTransactions(user.id, normaliseFilters({ pageSize: "10" })),
+      listTransactions(user.id, normaliseFilters({ pageSize: "10", from, to })),
       listActiveAccounts(user.id),
       listCategories(user.id),
     ]);
