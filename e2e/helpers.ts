@@ -35,3 +35,26 @@ export async function addAccount(
   // resolves instantly and the next navigation aborts the action mid-flight.
   await page.locator("main li").filter({ hasText: name }).waitFor();
 }
+
+/**
+ * Files the expense under Groceries explicitly, rather than leaving the
+ * form's default category selection in place: the seeded default categories
+ * sort alphabetically within "expense" (Dining, Groceries, Health, ...), so
+ * the form's own default is Dining, not Groceries. budgets.spec.ts sets a
+ * budget on Groceries and checks the spend line for that same category, so
+ * the expense has to actually land there.
+ */
+export async function addExpense(page: Page, amount: string, payee: string) {
+  await page.goto("/transactions");
+  await page.getByRole("button", { name: /New transaction|Add transaction/ }).click();
+  await page.getByLabel("Amount").fill(amount);
+  await page.getByLabel("Category").click();
+  await page.getByRole("option", { name: "Groceries" }).click();
+  await page.getByLabel("Payee").fill(payee);
+  await page.getByRole("button", { name: "Save transaction" }).click();
+  // Not a plain `getByText(payee)`: the list and the table render the same
+  // row in two DOM shapes and CSS hides one of them (see `visibleRow` in
+  // transactions.spec.ts), so an unfiltered match is never unique and
+  // `waitFor` throws a strict-mode violation before ever checking visibility.
+  await page.getByText(payee).filter({ visible: true }).waitFor();
+}

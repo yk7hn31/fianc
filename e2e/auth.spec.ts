@@ -13,7 +13,13 @@ test("signup with the code lands on the dashboard", async ({ page }) => {
   await page.getByLabel("Password").fill("a-long-enough-password");
   await page.getByLabel("Signup code").fill(code);
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
+  // A longer timeout than the 5s default, not a flaky wait: this is the
+  // first hit any test makes on /dashboard in a cold dev server, and that
+  // route now queries totals, budgets and the transaction list and renders a
+  // Recharts donut — its first-ever compile alone measured ~5.8s locally,
+  // just over the default. Every later visit in the same run reuses the
+  // compiled bundle and resolves quickly.
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
 });
 
 test("signup without the right code is rejected", async ({ page }) => {
@@ -45,7 +51,10 @@ test("login then logout", async ({ page }) => {
   await page.getByLabel("Password").fill("a-long-enough-password");
   await page.getByLabel("Signup code").fill(code);
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
+  // Same cold-compile allowance as the test above: whichever test's browser
+  // context happens to be the first of the parallel workers to hit
+  // /dashboard pays for its first compile.
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/);
@@ -53,5 +62,5 @@ test("login then logout", async ({ page }) => {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("a-long-enough-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
 });
