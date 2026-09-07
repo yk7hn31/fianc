@@ -1,9 +1,49 @@
 "use client";
 
-import type { ComponentProps, ReactNode } from "react";
+import {
+  useActionState,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ActionResult } from "@/lib/action-result";
+
+type FormAction = (
+  prev: ActionResult | null,
+  formData: FormData,
+) => Promise<ActionResult>;
+
+/**
+ * `useActionState` plus the reset React does not give it.
+ *
+ * Every form here lives in a dialog that unmounts its fields on close while
+ * this state survives in the parent, so a rejected submit's field errors come
+ * back with the next open: a blank form whose amount input is already
+ * `aria-invalid`, wired to a visible `#amount-error`, announcing why the last
+ * value was wrong before a key is pressed. The transaction form needs the same
+ * clearing on a mode switch — those errors belong to the form the user left.
+ *
+ * Dismissal records the state *object* rather than flipping a flag, because
+ * the flag would have to be re-armed on submit and `useActionState` keeps the
+ * previous state for the whole pending window — the discarded errors would
+ * flash back while the next save was in flight. Identity holds because `fail`
+ * and `ok` build a fresh object per call.
+ */
+export function useResettableActionState(
+  action: FormAction,
+): [ActionResult | null, (formData: FormData) => void, boolean, () => void] {
+  const [state, formAction, pending] = useActionState(action, null);
+  const [dismissed, setDismissed] = useState<ActionResult | null>(null);
+
+  return [
+    state === dismissed ? null : state,
+    formAction,
+    pending,
+    () => setDismissed(state),
+  ];
+}
 
 /**
  * Reads the first message for a field out of an action's result.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import {
   FieldShell,
   FormField,
   fieldErrorReader,
+  useResettableActionState,
 } from "@/components/form-field";
 import {
   Select,
@@ -19,12 +20,36 @@ import {
 import { ResponsiveDialog } from "@/components/responsive/responsive-dialog";
 import { createAccount } from "./actions";
 
+/*
+ * Base UI resolves the closed trigger's text from `items`, not from the
+ * mounted options — the popup has not rendered yet. Without it the trigger
+ * falls back to stringifying the value and reads "credit_card".
+ */
+const TYPE_LABELS: Record<string, string> = {
+  checking: "Checking",
+  savings: "Savings",
+  cash: "Cash",
+  credit_card: "Credit card",
+  investment: "Investment",
+};
+
 export function AccountForm() {
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(createAccount, null);
+  const [state, formAction, pending, resetState] =
+    useResettableActionState(createAccount);
+
+  // Closing has to drop the last result, not just hide it: the fields unmount
+  // with the dialog but this state does not, so the next open would reopen an
+  // empty form still carrying the previous submit's field errors.
+  function changeOpen(next: boolean) {
+    if (!next) resetState();
+    setOpen(next);
+  }
 
   useEffect(() => {
     if (state?.ok) {
+      // No reset here: a successful result carries no field errors, so there
+      // is nothing stale for the next open to inherit.
       setOpen(false);
       toast.success("Account added");
     } else if (state && !state.ok) {
@@ -37,7 +62,7 @@ export function AccountForm() {
   return (
     <ResponsiveDialog
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={changeOpen}
       title="New account"
       description="Cash, a card, or anything you want a balance for."
       trigger={
@@ -51,7 +76,7 @@ export function AccountForm() {
         <FormField label="Name" name="name" error={fieldError("name")} />
 
         <FieldShell label="Type" name="type" error={fieldError("type")}>
-          <Select name="type" defaultValue="checking">
+          <Select name="type" items={TYPE_LABELS} defaultValue="checking">
             <SelectTrigger
               id="type"
               aria-invalid={Boolean(fieldError("type"))}
@@ -61,11 +86,11 @@ export function AccountForm() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="checking">Checking</SelectItem>
-              <SelectItem value="savings">Savings</SelectItem>
-              <SelectItem value="cash">Cash</SelectItem>
-              <SelectItem value="credit_card">Credit card</SelectItem>
-              <SelectItem value="investment">Investment</SelectItem>
+              {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </FieldShell>

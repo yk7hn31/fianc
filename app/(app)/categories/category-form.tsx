@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import {
   FieldShell,
   FormField,
   fieldErrorReader,
+  useResettableActionState,
 } from "@/components/form-field";
 import {
   Select,
@@ -28,13 +29,34 @@ function humanizeIconName(name: string): string {
   return name.replace(/([a-z])([A-Z])/g, "$1 $2");
 }
 
+/*
+ * Base UI resolves the closed trigger's text from `items`, not from the
+ * mounted options — the popup has not rendered yet. Without it the trigger
+ * falls back to stringifying the value and reads "expense".
+ */
+const KIND_LABELS: Record<string, string> = {
+  expense: "Expense",
+  income: "Income",
+};
+
 export function CategoryForm() {
   const [open, setOpen] = useState(false);
   const [icon, setIcon] = useState("Circle");
-  const [state, formAction, pending] = useActionState(createCategory, null);
+  const [state, formAction, pending, resetState] =
+    useResettableActionState(createCategory);
+
+  // Closing has to drop the last result, not just hide it: the fields unmount
+  // with the dialog but this state does not, so the next open would reopen an
+  // empty form still carrying the previous submit's field errors.
+  function changeOpen(next: boolean) {
+    if (!next) resetState();
+    setOpen(next);
+  }
 
   useEffect(() => {
     if (state?.ok) {
+      // No reset here: a successful result carries no field errors, so there
+      // is nothing stale for the next open to inherit.
       setOpen(false);
       setIcon("Circle");
       toast.success("Category added");
@@ -67,7 +89,7 @@ export function CategoryForm() {
   return (
     <ResponsiveDialog
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={changeOpen}
       title="New category"
       description="Group your transactions the way you actually think about them."
       trigger={
@@ -81,7 +103,7 @@ export function CategoryForm() {
         <FormField label="Name" name="name" error={fieldError("name")} />
 
         <FieldShell label="Kind" name="kind" error={fieldError("kind")}>
-          <Select name="kind" defaultValue="expense">
+          <Select name="kind" items={KIND_LABELS} defaultValue="expense">
             <SelectTrigger
               id="kind"
               aria-invalid={Boolean(fieldError("kind"))}
@@ -91,8 +113,11 @@ export function CategoryForm() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="expense">Expense</SelectItem>
-              <SelectItem value="income">Income</SelectItem>
+              {Object.entries(KIND_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </FieldShell>
