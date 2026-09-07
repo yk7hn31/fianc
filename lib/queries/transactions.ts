@@ -122,7 +122,20 @@ export async function spendByCategory(
       spent: sql<number>`sum(${transactions.amountMinor})`,
     })
     .from(transactions)
-    .leftJoin(categories, eq(categories.id, transactions.categoryId))
+    // The join condition is scoped by user, not just the transaction: the
+    // category FK is global, so a transaction pointing at another tenant's
+    // category id would otherwise pull that tenant's category name and icon
+    // straight into this user's breakdown. Today only the write-path
+    // `ownsCategory` check stops such a row existing; the follow-on plan adds
+    // CSV import and recurring rules, which are new write paths that could
+    // miss it. A read model should not depend on every writer being correct.
+    .leftJoin(
+      categories,
+      and(
+        eq(categories.id, transactions.categoryId),
+        eq(categories.userId, userId),
+      ),
+    )
     .where(
       and(
         eq(transactions.userId, userId),
