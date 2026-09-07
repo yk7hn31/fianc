@@ -18,6 +18,14 @@ const buttonVariants = cva(
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
       },
+      // These are the upstream shadcn sizes and none of them clears the 44px
+      // minimum touch target this app is held to (DESIGN.md / the spec's
+      // mobile section): `default` and `icon` are 32px, `sm` 28px, `lg` 36px.
+      // They are left as they are so a size prop still means what it means
+      // everywhere else — call sites opt in instead, with an explicit `h-11`
+      // (or `h-11 w-11` for a square icon button) in `className`. Note that
+      // `size-8` and `h-11 w-11` do NOT tailwind-merge, so an icon button
+      // must either drop `size: "icon"` or override with `size-11`.
       size: {
         default:
           "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",

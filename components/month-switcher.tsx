@@ -29,7 +29,10 @@ export function MonthSwitcher({
       <Link
         href={`${basePath}?month=${addMonths(month, -1)}`}
         aria-label="Previous month"
-        className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
+        // Explicitly 44px, not `size: "icon"`: that variant is `size-8`, and
+        // this is the primary control of both the dashboard and the budgets
+        // page. See the note on the size variants in components/ui/button.tsx.
+        className={cn(buttonVariants({ variant: "ghost" }), "h-11 w-11 p-0")}
       >
         <ChevronLeft className="size-4" strokeWidth={1.5} />
       </Link>
@@ -37,7 +40,10 @@ export function MonthSwitcher({
       <Link
         href={`${basePath}?month=${addMonths(month, 1)}`}
         aria-label="Next month"
-        className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
+        // Explicitly 44px, not `size: "icon"`: that variant is `size-8`, and
+        // this is the primary control of both the dashboard and the budgets
+        // page. See the note on the size variants in components/ui/button.tsx.
+        className={cn(buttonVariants({ variant: "ghost" }), "h-11 w-11 p-0")}
       >
         <ChevronRight className="size-4" strokeWidth={1.5} />
       </Link>
