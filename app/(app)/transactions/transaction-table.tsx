@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { formatAmount } from "@/lib/money";
 import { CategoryIcon } from "@/components/category-icon";
 import {
@@ -8,71 +11,132 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { Account, Category } from "@/lib/db/schema";
 import type { TxRow } from "@/lib/queries/transactions";
+import { SelectionBar } from "./selection-bar";
+import { SortHeader } from "./sort-header";
+import { RowActions } from "./row-actions";
 
 export function TransactionTable({
   rows,
   currency,
+  accounts,
+  categories,
 }: {
   rows: TxRow[];
   currency: string;
+  accounts: Account[];
+  categories: Category[];
 }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)));
+  }
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   return (
-    <div className="hidden overflow-hidden rounded-card border border-border bg-card shadow-card md:block">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="pl-4">Date</TableHead>
-            <TableHead>Payee</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Account</TableHead>
-            <TableHead className="pr-4 text-right">Amount</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((t) => (
-            <TableRow key={t.id}>
-              {/*
-                The stored ISO day, not a localised one: this column is scanned
-                as a column, and a fixed-width sortable-looking date is easier
-                to read down than "Jan 15, 2026" of varying length.
-              */}
-              <TableCell className="pl-4 tabular-nums text-muted-foreground">
-                {t.date}
-              </TableCell>
-              {/*
-                Capped and truncated, because `TableCell` is `whitespace-nowrap`
-                and a payee is free text: one long line pushed Category,
-                Account and the Amount out of the viewport and into the table's
-                horizontal scroller, which draws no visible bar on macOS. The
-                inner span carries the cap — `max-width` on a `td` under the
-                default auto table layout is treated as a hint.
-              */}
-              <TableCell>
-                <span
-                  className="block max-w-[26ch] truncate"
-                  title={t.payee || undefined}
-                >
-                  {t.payee || "—"}
+    <div className="hidden md:block">
+      <SelectionBar
+        selected={[...selected]}
+        onCleared={() => setSelected(new Set())}
+      />
+      <div className="overflow-hidden rounded-card border border-border bg-card shadow-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10 pl-4">
+                <input
+                  type="checkbox"
+                  aria-label="Select all transactions"
+                  className="size-4 rounded-small border-border accent-foreground"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                />
+              </TableHead>
+              <TableHead className="pl-0">
+                <SortHeader column="date">Date</SortHeader>
+              </TableHead>
+              <TableHead>
+                <SortHeader column="payee">Payee</SortHeader>
+              </TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Account</TableHead>
+              <TableHead className="pr-4 text-right">
+                <span className="inline-flex w-full justify-end">
+                  <SortHeader column="amount">Amount</SortHeader>
                 </span>
-              </TableCell>
-              <TableCell>
-                <span className="inline-flex items-center gap-2">
-                  <CategoryIcon name={t.categoryIcon ?? "Circle"} />
-                  {t.categoryName ??
-                    (t.type === "transfer" ? "Transfer" : "Uncategorised")}
-                </span>
-              </TableCell>
-              <TableCell>{t.accountName}</TableCell>
-              {/* Signed from `direction`; see the note in transaction-list.tsx. */}
-              <TableCell className="pr-4 text-right tabular-nums">
-                {t.direction === 1 ? "+" : "−"}
-                {formatAmount(t.amountMinor, currency)}
-              </TableCell>
+              </TableHead>
+              <TableHead className="w-10" />
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {rows.map((t) => (
+              <TableRow key={t.id} data-state={selected.has(t.id) ? "selected" : undefined}>
+                <TableCell className="pl-4">
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${t.payee || t.categoryName || "transaction"}`}
+                    className="size-4 rounded-small border-border accent-foreground"
+                    checked={selected.has(t.id)}
+                    onChange={() => toggleOne(t.id)}
+                  />
+                </TableCell>
+                {/*
+                  The stored ISO day, not a localised one: this column is scanned
+                  as a column, and a fixed-width sortable-looking date is easier
+                  to read down than "Jan 15, 2026" of varying length.
+                */}
+                <TableCell className="pl-0 tabular-nums text-muted-foreground">
+                  {t.date}
+                </TableCell>
+                {/*
+                  Capped and truncated, because `TableCell` is `whitespace-nowrap`
+                  and a payee is free text: one long line pushed Category,
+                  Account and the Amount out of the viewport and into the table's
+                  horizontal scroller, which draws no visible bar on macOS. The
+                  inner span carries the cap — `max-width` on a `td` under the
+                  default auto table layout is treated as a hint.
+                */}
+                <TableCell>
+                  <span
+                    className="block max-w-[26ch] truncate"
+                    title={t.payee || undefined}
+                  >
+                    {t.payee || "—"}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <span className="inline-flex items-center gap-2">
+                    <CategoryIcon name={t.categoryIcon ?? "Circle"} />
+                    {t.categoryName ??
+                      (t.type === "transfer" ? "Transfer" : "Uncategorised")}
+                  </span>
+                </TableCell>
+                <TableCell>{t.accountName}</TableCell>
+                {/* Signed from `direction`; see the note in transaction-list.tsx. */}
+                <TableCell className="pr-4 text-right tabular-nums">
+                  {t.direction === 1 ? "+" : "−"}
+                  {formatAmount(t.amountMinor, currency)}
+                </TableCell>
+                <TableCell>
+                  <RowActions row={t} accounts={accounts} categories={categories} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

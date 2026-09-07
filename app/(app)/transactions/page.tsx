@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Plus, Wallet } from "lucide-react";
 import { requireUser } from "@/lib/auth/guard";
@@ -12,6 +13,8 @@ import { cn } from "@/lib/utils";
 import { TransactionForm } from "./transaction-form";
 import { TransactionList } from "./transaction-list";
 import { TransactionTable } from "./transaction-table";
+import { FilterBar } from "./filter-bar";
+import { Pagination } from "./pagination";
 
 /**
  * A repeated query parameter arrives as an array — `?q=a&q=b` — and every
@@ -77,65 +80,84 @@ export default async function TransactionsPage({
     <>
       <AppHeader title="Transactions" />
 
-      {/*
-        Two instances of the same form, one per trigger. They cannot collide on
-        the duplicate element ids inside: ResponsiveDialog mounts its children
-        only while open, each trigger is hidden at the breakpoint the other
-        belongs to, and a dialog opened from one is modal.
-      */}
-      <div className="mb-5 hidden md:block">
-        <TransactionForm
-          accounts={accounts}
-          categories={categories}
-          trigger={
-            <Button>
-              <Plus className="size-4" strokeWidth={1.5} />
-              New transaction
-            </Button>
-          }
-        />
-      </div>
+      <Suspense>
+        {/*
+          Two instances of the same form, one per trigger. They cannot collide on
+          the duplicate element ids inside: ResponsiveDialog mounts its children
+          only while open, each trigger is hidden at the breakpoint the other
+          belongs to, and a dialog opened from one is modal.
+        */}
+        <div className="mb-5 hidden md:block">
+          <TransactionForm
+            accounts={accounts}
+            categories={categories}
+            trigger={
+              <Button>
+                <Plus className="size-4" strokeWidth={1.5} />
+                New transaction
+              </Button>
+            }
+          />
+        </div>
 
-      <div className="md:hidden">
-        <TransactionForm
-          accounts={accounts}
-          categories={categories}
-          trigger={<AddFabTrigger />}
-        />
-      </div>
+        <div className="md:hidden">
+          <TransactionForm
+            accounts={accounts}
+            categories={categories}
+            trigger={<AddFabTrigger />}
+          />
+        </div>
 
-      {/*
-        `total`, not `rows.length`: the query pages, so an out-of-range page
-        comes back with no rows while plenty of transactions match. Branching
-        on the rows told a user with a full ledger that they had never
-        recorded anything.
-      */}
-      {total === 0 ? (
-        <p className="text-muted-foreground">
-          No transactions yet. Add your first one.
-        </p>
-      ) : rows.length === 0 ? (
-        <p className="text-muted-foreground">
-          Nothing on page {filters.page}. The list has {entries(total)}, on
-          earlier pages.
-        </p>
-      ) : (
-        <>
-          <TransactionList rows={rows} currency={user.baseCurrency} />
-          <TransactionTable rows={rows} currency={user.baseCurrency} />
-          {/*
-            What is on screen out of what matches. The bare total read as the
-            whole list while the query had already truncated it to a page, so
-            51 transactions showed 50 rows above the words "51 transactions"
-            and the 51st was simply gone. "Entries", not "transactions",
-            because a transfer is one row per account here — two entries for
-            one movement of money, the way a bank statement shows it.
-          */}
-          <p className="mt-3 text-caption text-muted-foreground">
-            Showing {rows.length} of {entries(total)}
+        <FilterBar accounts={accounts} categories={categories} />
+
+        {/*
+          `total`, not `rows.length`: the query pages, so an out-of-range page
+          comes back with no rows while plenty of transactions match. Branching
+          on the rows told a user with a full ledger that they had never
+          recorded anything.
+        */}
+        {total === 0 ? (
+          <p className="text-muted-foreground">
+            No transactions yet. Add your first one.
           </p>
-        </>
-      )}
+        ) : rows.length === 0 ? (
+          <p className="text-muted-foreground">
+            Nothing on page {filters.page}. The list has {entries(total)}, on
+            earlier pages.
+          </p>
+        ) : (
+          <>
+            <TransactionList
+              rows={rows}
+              currency={user.baseCurrency}
+              accounts={accounts}
+              categories={categories}
+            />
+            <TransactionTable
+              rows={rows}
+              currency={user.baseCurrency}
+              accounts={accounts}
+              categories={categories}
+            />
+            {/*
+              What is on screen out of what matches. The bare total read as the
+              whole list while the query had already truncated it to a page, so
+              51 transactions showed 50 rows above the words "51 transactions"
+              and the 51st was simply gone. "Entries", not "transactions",
+              because a transfer is one row per account here — two entries for
+              one movement of money, the way a bank statement shows it.
+            */}
+            <p className="mt-3 text-caption text-muted-foreground">
+              Showing {rows.length} of {entries(total)}
+            </p>
+            <Pagination
+              page={filters.page}
+              pageSize={filters.pageSize}
+              total={total}
+            />
+          </>
+        )}
+      </Suspense>
     </>
   );
 }

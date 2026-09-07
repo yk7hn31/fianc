@@ -171,28 +171,132 @@ export async function createTransfer(
   return ok();
 }
 
-/** Deleting either half of a transfer deletes both. */
-export async function deleteTransaction(id: string): Promise<ActionResult> {
+const updateInput = txInput.extend({ id: z.uuid() });
+
+/**
+ * Editing either half of a transfer edits both, so the pair can never drift
+ * apart in amount or date.
+ */
+export async function updateTransaction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
   const user = await requireUser();
+  const parsed = updateInput.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return fail("Check the form", z.flattenError(parsed.error).fieldErrors);
+  }
+  const { id, accountId, amount, date, payee, note, type, categoryId } =
+    parsed.data;
+
+  const money = parseAmount(amount, user.baseCurrency);
+  if (!money.ok) return fail("Check the form", { amount: [money.error] });
 
   try {
-    const [row] = await db
-      .select({ transferGroupId: transactions.transferGroupId })
+    const [existing] = await db
+      .select({
+        id: transactions.id,
+        transferGroupId: transactions.transferGroupId,
+      })
       .from(transactions)
       .where(and(eq(transactions.id, id), eq(transactions.userId, user.id)))
       .limit(1);
+    if (!existing) return fail("Transaction not found");
 
-    // Another user's row must read as missing, not as forbidden.
-    if (!row) return fail("Transaction not found");
+    if (existing.transferGroupId) {
+      // Only the shared fields are editable on a transfer; the accounts and
+      // directions belong to the pair, not to one row.
+      await db
+        .update(transactions)
+        .set({ amountMinor: money.value, date, payee, note, updatedAt: new Date() })
+        .where(
+          and(
+            eq(transactions.userId, user.id),
+            eq(transactions.transferGroupId, existing.transferGroupId),
+          ),
+        );
+    } else {
+      if (!(await ownsAccounts(user.id, [accountId]))) {
+        return fail("Account not found");
+      }
+      if (categoryId && !(await ownsCategory(user.id, categoryId))) {
+        return fail("Category not found");
+      }
+      await db
+        .update(transactions)
+        .set({
+          accountId,
+          categoryId: categoryId ? categoryId : null,
+          type,
+          direction: directionFor(type),
+          amountMinor: money.value,
+          date,
+          payee,
+          note,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(transactions.id, id), eq(transactions.userId, user.id)));
+    }
+  } catch {
+    return fail("Could not save the transaction. Try again.");
+  }
 
-    await db.delete(transactions).where(
-      and(
-        eq(transactions.userId, user.id),
-        row.transferGroupId
-          ? eq(transactions.transferGroupId, row.transferGroupId)
-          : eq(transactions.id, id),
-      ),
-    );
+  revalidatePath("/transactions");
+  revalidatePath("/accounts");
+  revalidatePath("/dashboard");
+  revalidatePath("/budgets");
+  return ok();
+}
+
+/** Deletes the given rows, pulling in the other half of any transfer. */
+export async function deleteTransactions(ids: string[]): Promise<ActionResult> {
+  const user = await requireUser();
+  const parsed = z.array(z.uuid()).min(1).max(500).safeParse(ids);
+  if (!parsed.success) return fail("Nothing selected");
+
+  try {
+    const rows = await db
+      .select({
+        id: transactions.id,
+        transferGroupId: transactions.transferGroupId,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.userId, user.id),
+          inArray(transactions.id, parsed.data),
+        ),
+      );
+    // Another user's rows must read as missing, not as forbidden.
+    if (rows.length === 0) return fail("Transaction not found");
+
+    const groups = rows
+      .map((r) => r.transferGroupId)
+      .filter((g): g is string => g !== null);
+
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(transactions)
+        .where(
+          and(
+            eq(transactions.userId, user.id),
+            inArray(
+              transactions.id,
+              rows.map((r) => r.id),
+            ),
+          ),
+        );
+      if (groups.length > 0) {
+        await tx
+          .delete(transactions)
+          .where(
+            and(
+              eq(transactions.userId, user.id),
+              inArray(transactions.transferGroupId, groups),
+            ),
+          );
+      }
+    });
   } catch {
     return fail("Could not delete the transaction. Try again.");
   }

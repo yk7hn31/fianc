@@ -89,6 +89,25 @@ describe("normaliseFilters", () => {
   });
 });
 
+describe("normaliseFilters — sorting", () => {
+  it("defaults to newest first", () => {
+    expect(normaliseFilters({})).toMatchObject({ sort: "date", dir: "desc" });
+  });
+
+  it("accepts the sortable columns", () => {
+    expect(normaliseFilters({ sort: "amount" }).sort).toBe("amount");
+    expect(normaliseFilters({ sort: "payee" }).sort).toBe("payee");
+  });
+
+  it("falls back to date for an unknown column", () => {
+    expect(normaliseFilters({ sort: "dropTable" }).sort).toBe("date");
+  });
+
+  it("falls back to desc for an unknown direction", () => {
+    expect(normaliseFilters({ dir: "sideways" }).dir).toBe("desc");
+  });
+});
+
 describe("escapeLike", () => {
   it("leaves ordinary text untouched", () => {
     expect(escapeLike("coffee")).toBe("coffee");
@@ -168,7 +187,15 @@ describe("buildTxWhere", () => {
     const query = new QueryBuilder()
       .select({ id: transactions.id })
       .from(transactions)
-      .where(buildTxWhere(userId, { page: 1, pageSize: 50, ...f }));
+      .where(
+        buildTxWhere(userId, {
+          page: 1,
+          pageSize: 50,
+          sort: "date",
+          dir: "desc",
+          ...f,
+        }),
+      );
     return dialect.sqlToQuery(query.getSQL());
   }
 

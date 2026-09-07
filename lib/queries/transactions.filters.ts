@@ -7,6 +7,8 @@ export interface TxFilters {
   q?: string;
   page: number;
   pageSize: number;
+  sort: "date" | "amount" | "payee";
+  dir: "asc" | "desc";
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -105,5 +107,8 @@ export function normaliseFilters(
     q: q ? q : undefined,
     page,
     pageSize,
+    sort:
+      input.sort === "amount" || input.sort === "payee" ? input.sort : "date",
+    dir: input.dir === "asc" ? "asc" : "desc",
   };
 }

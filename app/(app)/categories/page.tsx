@@ -3,7 +3,9 @@ import { listCategories } from "@/lib/queries/categories";
 import { AppHeader } from "@/components/app-shell/app-header";
 import { CategoryIcon } from "@/components/category-icon";
 import { Card, CardContent } from "@/components/ui/card";
+import { ArchiveButton } from "@/components/archive-button";
 import { CategoryForm } from "./category-form";
+import { archiveCategory } from "./actions";
 
 export default async function CategoriesPage() {
   const user = await requireUser();
@@ -31,9 +33,15 @@ export default async function CategoriesPage() {
                 {all
                   .filter((c) => c.kind === kind)
                   .map((c) => (
-                    <li key={c.id} className="flex items-center gap-2">
-                      <CategoryIcon name={c.icon} />
-                      {c.name}
+                    <li key={c.id} className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2">
+                        <CategoryIcon name={c.icon} />
+                        {c.name}
+                      </span>
+                      <ArchiveButton
+                        label={c.name}
+                        onArchive={archiveCategory.bind(null, c.id)}
+                      />
                     </li>
                   ))}
               </ul>

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   accounts,
@@ -29,6 +29,14 @@ export async function listTransactions(
 ): Promise<{ rows: TxRow[]; total: number }> {
   const clause = buildTxWhere(userId, f);
 
+  const column =
+    f.sort === "amount"
+      ? transactions.amountMinor
+      : f.sort === "payee"
+        ? transactions.payee
+        : transactions.date;
+  const order = f.dir === "asc" ? asc : desc;
+
   const rows = await db
     .select({
       tx: transactions,
@@ -42,9 +50,10 @@ export async function listTransactions(
     // a transfer always are.
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
     .where(clause)
-    // `date` is a day, so same-day rows would otherwise come back in whatever
-    // order the plan produced; createdAt keeps the newest entry on top.
-    .orderBy(desc(transactions.date), desc(transactions.createdAt))
+    // Same-day (or same-amount, same-payee) rows would otherwise come back in
+    // whatever order the plan produced; createdAt keeps the newest entry on
+    // top as the tiebreaker regardless of the primary sort.
+    .orderBy(order(column), desc(transactions.createdAt))
     .limit(f.pageSize)
     .offset((f.page - 1) * f.pageSize);
 

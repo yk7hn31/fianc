@@ -1,6 +1,8 @@
 import { formatAmount } from "@/lib/money";
 import { CategoryIcon } from "@/components/category-icon";
+import type { Account, Category } from "@/lib/db/schema";
 import type { TxRow } from "@/lib/queries/transactions";
+import { RowActions } from "./row-actions";
 
 /**
  * A "YYYY-MM-DD" heading, read as a calendar day rather than an instant.
@@ -38,9 +40,13 @@ function groupByDate(rows: TxRow[]): [string, TxRow[]][] {
 export function TransactionList({
   rows,
   currency,
+  accounts,
+  categories,
 }: {
   rows: TxRow[];
   currency: string;
+  accounts: Account[];
+  categories: Category[];
 }) {
   return (
     <div className="space-y-4 md:hidden">
@@ -82,6 +88,7 @@ export function TransactionList({
                   {t.direction === 1 ? "+" : "−"}
                   {formatAmount(t.amountMinor, currency)}
                 </span>
+                <RowActions row={t} accounts={accounts} categories={categories} />
               </li>
             ))}
           </ul>

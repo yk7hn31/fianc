@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth/guard";
 import { monthTotals, spendByCategory, listTransactions, normaliseFilters } from "@/lib/queries/transactions";
@@ -128,8 +129,25 @@ export default async function DashboardPage({
       </div>
 
       <h2 className="text-subheading font-medium mb-3">Recent</h2>
-      <TransactionList rows={recent.rows} currency={currency} />
-      <TransactionTable rows={recent.rows} currency={currency} />
+      {/*
+        TransactionTable's sortable headers read the URL with useSearchParams,
+        which Next.js requires a Suspense boundary above — the transactions
+        page (also a consumer of these two components) needs the same wrapper.
+      */}
+      <Suspense>
+        <TransactionList
+          rows={recent.rows}
+          currency={currency}
+          accounts={accounts}
+          categories={categories}
+        />
+        <TransactionTable
+          rows={recent.rows}
+          currency={currency}
+          accounts={accounts}
+          categories={categories}
+        />
+      </Suspense>
 
       <div className="md:hidden">
         <TransactionForm

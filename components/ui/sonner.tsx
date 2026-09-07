@@ -7,6 +7,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme="light"
+      // Parked finding from Task 11: sonner's default bottom-right position
+      // sits directly over a mobile ResponsiveDialog's bottom-sheet drawer, so
+      // an error toast could park on top of the drawer's Save button and eat
+      // its taps until the toast faded. Top-center never overlaps a bottom
+      // sheet at any viewport this app supports.
+      position="top-center"
       className="toaster group"
       icons={{
         success: (
