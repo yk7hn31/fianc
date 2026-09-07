@@ -88,7 +88,12 @@ export function TransactionList({
                   {t.direction === 1 ? "+" : "−"}
                   {formatAmount(t.amountMinor, currency)}
                 </span>
-                <RowActions row={t} accounts={accounts} categories={categories} />
+                <RowActions
+                    row={t}
+                    currency={currency}
+                    accounts={accounts}
+                    categories={categories}
+                  />
               </li>
             ))}
           </ul>

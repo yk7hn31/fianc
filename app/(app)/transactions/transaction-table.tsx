@@ -148,7 +148,12 @@ export function TransactionTable({
                   {formatAmount(t.amountMinor, currency)}
                 </TableCell>
                 <TableCell>
-                  <RowActions row={t} accounts={accounts} categories={categories} />
+                  <RowActions
+                    row={t}
+                    currency={currency}
+                    accounts={accounts}
+                    categories={categories}
+                  />
                 </TableCell>
               </TableRow>
             ))}

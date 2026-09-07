@@ -1,11 +1,15 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  FieldShell,
+  FormField,
+  fieldErrorReader,
+  useResettableActionState,
+} from "@/components/form-field";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,21 +24,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ResponsiveDialog } from "@/components/responsive/responsive-dialog";
+import { toAmountInput } from "@/lib/money";
 import type { Account, Category } from "@/lib/db/schema";
 import type { TxRow } from "@/lib/queries/transactions";
 import { updateTransaction, deleteTransactions } from "./actions";
 
 export function RowActions({
   row,
+  currency,
   accounts,
   categories,
 }: {
   row: TxRow;
+  currency: string;
   accounts: Account[];
   categories: Category[];
 }) {
   const [editing, setEditing] = useState(false);
-  const [state, formAction, pending] = useActionState(updateTransaction, null);
+  const [state, formAction, pending, resetState] =
+    useResettableActionState(updateTransaction);
   const [busy, startTransition] = useTransition();
 
   useEffect(() => {
@@ -46,9 +54,16 @@ export function RowActions({
     }
   }, [state]);
 
+  // The dialog unmounts its fields on close but this state outlives it, so
+  // without dropping the last result the next Edit would open a form already
+  // marked invalid over values the user never submitted.
+  function changeEditing(next: boolean) {
+    if (!next) resetState();
+    setEditing(next);
+  }
+
   const isTransfer = row.transferGroupId !== null;
-  const err = (k: string) =>
-    state && !state.ok ? state.fieldErrors?.[k]?.[0] : undefined;
+  const fieldError = fieldErrorReader(state);
   const relevant = categories.filter((c) =>
     row.type === "income" ? c.kind === "income" : c.kind === "expense",
   );
@@ -115,7 +130,7 @@ export function RowActions({
 
       <ResponsiveDialog
         open={editing}
-        onOpenChange={setEditing}
+        onOpenChange={changeEditing}
         title="Edit transaction"
         description={isTransfer ? "Transfers are edited as a pair." : undefined}
       >
@@ -127,41 +142,57 @@ export function RowActions({
             value={isTransfer ? "expense" : row.type}
           />
 
-          <div className="space-y-1.5">
-            <Label htmlFor={`amount-${row.id}`}>Amount</Label>
-            <Input
-              id={`amount-${row.id}`}
-              name="amount"
-              inputMode="decimal"
-              defaultValue={(row.amountMinor / 100).toFixed(2)}
-              className="h-11 tabular-nums"
-              aria-invalid={Boolean(err("amount"))}
-            />
-            {err("amount") && (
-              <p className="text-destructive text-caption">{err("amount")}</p>
-            )}
-          </div>
+          {/*
+            FormField / FieldShell, not a hand-rolled Label + Input + <p>:
+            this form had an error paragraph on `amount` only, so a rejected
+            date, account, category, payee or note produced a bare "Check the
+            form" toast and no indication of which field was wrong. The
+            shared components also wire `aria-describedby` to the message,
+            which the hand-rolled markup never did.
+          */}
+          <FormField
+            label="Amount"
+            name="amount"
+            inputMode="decimal"
+            // Not `(amountMinor / 100).toFixed(2)`: `updateTransaction`
+            // parses this value back with the user's own currency, so a
+            // hardcoded two-decimal divisor round-trips a zero-decimal
+            // currency out by 100x on every edit.
+            defaultValue={toAmountInput(row.amountMinor, currency)}
+            className="h-11 tabular-nums"
+            error={fieldError("amount")}
+          />
 
-          <div className="space-y-1.5">
-            <Label htmlFor={`account-${row.id}`}>Account</Label>
-            {/*
-              A disabled Base UI Select puts `disabled` straight onto its own
-              hidden submission input, so a disabled control is never a
-              successful one: `name="accountId"` here would make
-              `new FormData(form)` omit accountId entirely, and every
-              transfer edit would fail validation before ever reaching the
-              transfer branch below. The visible control stays disabled (a
-              transfer's account belongs to the pair, not to one row) but
-              carries no name; a plain hidden input submits the real value
-              instead.
-            */}
+          {/*
+            A disabled Base UI Select puts `disabled` straight onto its own
+            hidden submission input, so a disabled control is never a
+            successful one: `name="accountId"` here would make
+            `new FormData(form)` omit accountId entirely, and every
+            transfer edit would fail validation before ever reaching the
+            transfer branch below. The visible control stays disabled (a
+            transfer's account belongs to the pair, not to one row) but
+            carries no name; a plain hidden input submits the real value
+            instead.
+          */}
+          <FieldShell
+            label="Account"
+            name="accountId"
+            error={fieldError("accountId")}
+          >
             <Select
               name={isTransfer ? undefined : "accountId"}
               items={accountLabels}
               defaultValue={row.accountId}
               disabled={isTransfer}
             >
-              <SelectTrigger id={`account-${row.id}`} className="h-11">
+              <SelectTrigger
+                id="accountId"
+                aria-invalid={Boolean(fieldError("accountId"))}
+                aria-describedby={
+                  fieldError("accountId") ? "accountId-error" : undefined
+                }
+                className="h-11 w-full"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -173,17 +204,27 @@ export function RowActions({
             {isTransfer && (
               <input type="hidden" name="accountId" value={row.accountId} />
             )}
-          </div>
+          </FieldShell>
 
           {!isTransfer && (
-            <div className="space-y-1.5">
-              <Label htmlFor={`category-${row.id}`}>Category</Label>
+            <FieldShell
+              label="Category"
+              name="categoryId"
+              error={fieldError("categoryId")}
+            >
               <Select
                 name="categoryId"
                 items={categoryLabels}
                 defaultValue={row.categoryId ?? undefined}
               >
-                <SelectTrigger id={`category-${row.id}`} className="h-11">
+                <SelectTrigger
+                  id="categoryId"
+                  aria-invalid={Boolean(fieldError("categoryId"))}
+                  aria-describedby={
+                    fieldError("categoryId") ? "categoryId-error" : undefined
+                  }
+                  className="h-11 w-full"
+                >
                   <SelectValue placeholder="Uncategorised" />
                 </SelectTrigger>
                 <SelectContent>
@@ -192,29 +233,23 @@ export function RowActions({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </FieldShell>
           )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor={`date-${row.id}`}>Date</Label>
-            <Input
-              id={`date-${row.id}`}
-              name="date"
-              type="date"
-              defaultValue={row.date}
-              className="h-11"
-            />
-          </div>
+          <FormField
+            label="Date"
+            name="date"
+            type="date"
+            defaultValue={row.date}
+            error={fieldError("date")}
+          />
 
-          <div className="space-y-1.5">
-            <Label htmlFor={`payee-${row.id}`}>Payee</Label>
-            <Input
-              id={`payee-${row.id}`}
-              name="payee"
-              defaultValue={row.payee}
-              className="h-11"
-            />
-          </div>
+          <FormField
+            label="Payee"
+            name="payee"
+            defaultValue={row.payee}
+            error={fieldError("payee")}
+          />
 
           {/*
             Rendered, not omitted: updateTransaction writes `note`
@@ -223,15 +258,12 @@ export function RowActions({
             that never showed the field would silently blank an existing
             note on every save.
           */}
-          <div className="space-y-1.5">
-            <Label htmlFor={`note-${row.id}`}>Note</Label>
-            <Input
-              id={`note-${row.id}`}
-              name="note"
-              defaultValue={row.note}
-              className="h-11"
-            />
-          </div>
+          <FormField
+            label="Note"
+            name="note"
+            defaultValue={row.note}
+            error={fieldError("note")}
+          />
 
           <Button type="submit" className="w-full h-11" disabled={pending}>
             {pending ? "Saving…" : "Save changes"}
