@@ -18,13 +18,9 @@ import {
 } from "@/components/ui/select";
 import { ResponsiveDialog } from "@/components/responsive/responsive-dialog";
 import { CategoryIcon } from "@/components/category-icon";
+import { ICON_CHOICES } from "@/lib/category-icons";
 import { createCategory } from "./actions";
 
-const ICON_CHOICES = [
-  "Circle", "ShoppingCart", "House", "Bus", "UtensilsCrossed", "Plug",
-  "HeartPulse", "ShoppingBag", "Banknote", "Plane", "Dumbbell", "Gift",
-  "GraduationCap", "PawPrint", "Wrench", "Film",
-];
 
 // "UtensilsCrossed" -> "Utensils Crossed" — a screen reader should hear a
 // name, not a raw PascalCase icon identifier.

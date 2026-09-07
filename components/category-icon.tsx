@@ -1,4 +1,5 @@
-import { Circle, icons } from "lucide-react";
+import { Circle } from "lucide-react";
+import { CATEGORY_ICONS } from "@/lib/category-icons";
 
 export function CategoryIcon({
   name,
@@ -7,6 +8,6 @@ export function CategoryIcon({
   name: string;
   className?: string;
 }) {
-  const Icon = (icons as Record<string, typeof Circle>)[name] ?? Circle;
+  const Icon = CATEGORY_ICONS[name] ?? Circle;
   return <Icon className={className} strokeWidth={1.5} aria-hidden />;
 }
