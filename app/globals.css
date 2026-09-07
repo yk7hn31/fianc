@@ -25,6 +25,16 @@
   --color-hairline: #e5e5e5;
   --color-ember: #e7000b;
 
+  /*
+   * DESIGN.md's page ground is canvas, not white, so `background` maps to it —
+   * correct for the page, and a trap for the generated primitives. shadcn's
+   * own palette has `background` white and `muted` grey, so several of them
+   * reach for `bg-background` meaning "a raised white chip on a muted track":
+   * the active tab, the switch thumb, the outline button. Against this palette
+   * every one of those rendered canvas-on-canvas and vanished. Those three now
+   * say `bg-paper`. Reach for `bg-paper` — never `bg-background` — when you
+   * mean white.
+   */
   --color-background: var(--color-canvas);
   --color-foreground: var(--color-ink);
   --color-card: var(--color-paper);
