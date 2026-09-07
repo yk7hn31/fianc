@@ -4,6 +4,7 @@ import {
   Target,
   Wallet,
   Tags,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,10 +22,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/budgets", label: "Budgets", icon: Target, primary: true },
   { href: "/accounts", label: "Accounts", icon: Wallet, primary: false },
   { href: "/categories", label: "Categories", icon: Tags, primary: false },
-  // No Settings entry: `/settings` is in the spec's page list but has no
-  // route on this branch, so linking it from the sidebar and from the mobile
-  // "More" tab sent users to a 404 from primary navigation. It comes back
-  // when the page does.
+  { href: "/settings", label: "Settings", icon: Settings, primary: false },
 ];
 
 /**

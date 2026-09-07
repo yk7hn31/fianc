@@ -6,11 +6,28 @@ test("nothing in the app chrome links to a route that does not exist", async ({
 }) => {
   // Regression test for a Critical finding: NAV_ITEMS carried a /settings
   // entry, so the sidebar listed it and the mobile bar made it one of four
-  // tabs — and no such route was ever built on this branch. Asserted on the
-  // href rather than on the label, because the label is what would come back
-  // first if the entry were restored ahead of the page.
+  // tabs — and no such route was ever built. /settings exists now, so the
+  // assertion is no longer about that one href: every link the chrome
+  // renders gets visited, which catches the next entry added ahead of its
+  // page as well as this one.
   await signUp(page);
-  await expect(page.locator('nav a[href="/settings"]')).toHaveCount(0);
+
+  const hrefs = [
+    ...new Set(await page.locator("nav a[href^='/']").evaluateAll((links) =>
+      links.map((l) => l.getAttribute("href")!),
+    )),
+  ];
+  // The sidebar is in the DOM at every width, so this holds on both projects.
+  expect(hrefs.length).toBeGreaterThan(0);
+
+  for (const href of hrefs) {
+    const response = await page.goto(href);
+    expect(response?.status(), `${href} should not 404`).toBeLessThan(400);
+    await expect(
+      page.getByText("This page could not be found"),
+      `${href} should not render the 404 page`,
+    ).toHaveCount(0);
+  }
 });
 
 test("the More tab reaches the pages that are not in the bottom bar", async ({
