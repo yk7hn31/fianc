@@ -26,7 +26,7 @@ test("a non-default icon and kind are actually submitted", async ({
   await page.getByLabel("Name").fill("Side Hustle");
   await page.getByLabel("Kind").click();
   await page.getByRole("option", { name: "Income" }).click();
-  await page.getByRole("button", { name: "Gift" }).click();
+  await page.getByRole("radio", { name: "Gift" }).click();
   await page.getByRole("button", { name: "Add category" }).click();
 
   // Grouped under Income, not the default Expense group — this is what
@@ -41,5 +41,5 @@ test("a non-default icon and kind are actually submitted", async ({
   await expect(row).toBeVisible();
   // The icon picker's value has to reach the server too, not just default
   // to "Circle" silently.
-  await expect(row.locator("svg.lucide-gift")).toBeVisible();
+  await expect(row.locator('[data-icon="Gift"]')).toBeVisible();
 });

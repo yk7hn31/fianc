@@ -52,7 +52,12 @@ export function AccountForm() {
 
         <FieldShell label="Type" name="type" error={fieldError("type")}>
           <Select name="type" defaultValue="checking">
-            <SelectTrigger id="type" className="h-11">
+            <SelectTrigger
+              id="type"
+              aria-invalid={Boolean(fieldError("type"))}
+              aria-describedby={fieldError("type") ? "type-error" : undefined}
+              className="h-11"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

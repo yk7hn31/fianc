@@ -45,6 +45,25 @@ export function CategoryForm() {
 
   const fieldError = fieldErrorReader(state);
 
+  function handleIconKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    const step =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? 1
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? -1
+          : 0;
+    if (step === 0) return;
+    event.preventDefault();
+
+    const next =
+      (ICON_CHOICES.indexOf(icon) + step + ICON_CHOICES.length) %
+      ICON_CHOICES.length;
+    setIcon(ICON_CHOICES[next]);
+    event.currentTarget
+      .querySelectorAll<HTMLButtonElement>('[role="radio"]')
+      [next]?.focus();
+  }
+
   return (
     <ResponsiveDialog
       open={open}
@@ -63,7 +82,12 @@ export function CategoryForm() {
 
         <FieldShell label="Kind" name="kind" error={fieldError("kind")}>
           <Select name="kind" defaultValue="expense">
-            <SelectTrigger id="kind" className="h-11">
+            <SelectTrigger
+              id="kind"
+              aria-invalid={Boolean(fieldError("kind"))}
+              aria-describedby={fieldError("kind") ? "kind-error" : undefined}
+              className="h-11"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -75,13 +99,26 @@ export function CategoryForm() {
 
         <FieldShell label="Icon" name="icon" error={fieldError("icon")}>
           <input type="hidden" name="icon" value={icon} />
-          <div className="grid grid-cols-6 gap-2 md:grid-cols-8">
+          {/*
+            A radiogroup, not sixteen toggle buttons: exactly one icon is
+            chosen at a time, so aria-pressed would announce each as an
+            independent toggle and leave sixteen tab stops inside the form.
+          */}
+          <div
+            role="radiogroup"
+            aria-label="Icon"
+            onKeyDown={handleIconKeyDown}
+            className="grid grid-cols-6 gap-2 md:grid-cols-8"
+          >
             {ICON_CHOICES.map((name) => (
               <button
                 key={name}
                 type="button"
+                role="radio"
+                aria-checked={icon === name}
                 aria-label={humanizeIconName(name)}
-                aria-pressed={icon === name}
+                // Roving focus: the group is one tab stop, arrows move within.
+                tabIndex={icon === name ? 0 : -1}
                 onClick={() => setIcon(name)}
                 className={
                   icon === name

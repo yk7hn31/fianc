@@ -47,5 +47,10 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   Film,
 };
 
-/** What the icon picker offers, in display order. */
-export const ICON_CHOICES = Object.keys(CATEGORY_ICONS);
+/**
+ * What the icon picker offers, in display order — object literals iterate
+ * string keys in insertion order, so this is deterministic. Typed as a
+ * non-empty tuple so `z.enum` can be built from it, which keeps the action's
+ * accepted values and the picker's offered values the same list.
+ */
+export const ICON_CHOICES = Object.keys(CATEGORY_ICONS) as [string, ...string[]];

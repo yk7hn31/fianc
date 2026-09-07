@@ -6,12 +6,16 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { categories } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/guard";
+import { ICON_CHOICES } from "@/lib/category-icons";
 import { ok, fail, type ActionResult } from "@/lib/action-result";
 
 const categoryInput = z.object({
   name: z.string().trim().min(1, "Enter a name"),
   kind: z.enum(["income", "expense"]),
-  icon: z.string().trim().min(1).default("Circle"),
+  // Tied to the picker's own list: CategoryIcon falls back to Circle for a
+  // name it does not know, so a crafted post could otherwise store an icon
+  // that silently renders as something else, with no edit UI to correct it.
+  icon: z.enum(ICON_CHOICES).default("Circle"),
 });
 
 export async function createCategory(

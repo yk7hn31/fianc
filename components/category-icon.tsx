@@ -9,5 +9,14 @@ export function CategoryIcon({
   className?: string;
 }) {
   const Icon = CATEGORY_ICONS[name] ?? Circle;
-  return <Icon className={className} strokeWidth={1.5} aria-hidden />;
+  // data-icon so tests and styles key off a name this app owns, rather than
+  // lucide's generated class, which a version bump could rename.
+  return (
+    <Icon
+      className={className}
+      strokeWidth={1.5}
+      data-icon={name}
+      aria-hidden
+    />
+  );
 }
