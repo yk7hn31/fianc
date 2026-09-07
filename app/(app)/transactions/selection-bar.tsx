@@ -23,7 +23,17 @@ export function SelectionBar({
         variant="destructive"
         className="h-11"
         disabled={pending}
-        onClick={() =>
+        onClick={() => {
+          // These rows are gone for good once deleted — a mis-tap on a bulk
+          // selection is far costlier than on a single row.
+          const count = selected.length;
+          if (
+            !window.confirm(
+              `Delete ${count} ${count === 1 ? "transaction" : "transactions"}? This cannot be undone.`,
+            )
+          ) {
+            return;
+          }
           startTransition(async () => {
             const res = await deleteTransactions(selected);
             if (res.ok) {
@@ -32,8 +42,8 @@ export function SelectionBar({
             } else {
               toast.error(res.error);
             }
-          })
-        }
+          });
+        }}
       >
         <Trash2 className="size-4" strokeWidth={1.5} />
         Delete

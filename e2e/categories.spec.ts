@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signUp } from "./helpers";
+import { signUp, addAccount } from "./helpers";
 
 test("a new account is seeded with default categories", async ({ page }) => {
   await signUp(page);
@@ -42,4 +42,23 @@ test("a non-default icon and kind are actually submitted", async ({
   // The icon picker's value has to reach the server too, not just default
   // to "Circle" silently.
   await expect(row.locator('[data-icon="Gift"]')).toBeVisible();
+});
+
+test("archiving a category removes it from the categories page and the transaction picker", async ({
+  page,
+}) => {
+  await signUp(page);
+  await addAccount(page, "Checking", "0");
+  await page.goto("/categories");
+  await expect(page.getByText("Groceries", { exact: true })).toBeVisible();
+
+  // Exact match: sonner's own "Groceries archived" toast otherwise makes
+  // this a second match for the plain substring and trips strict mode.
+  await page.getByRole("button", { name: "Archive Groceries" }).click();
+  await expect(page.getByText("Groceries", { exact: true })).toBeHidden();
+
+  await page.goto("/transactions");
+  await page.getByRole("button", { name: /New transaction|Add transaction/ }).click();
+  await page.getByLabel("Category").click();
+  await expect(page.getByRole("option", { name: "Groceries" })).toHaveCount(0);
 });

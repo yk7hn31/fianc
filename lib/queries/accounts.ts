@@ -40,7 +40,12 @@ export async function listAccountsWithBalance(
     })
     .from(accounts)
     .leftJoin(delta, eq(delta.accountId, accounts.id))
-    .where(eq(accounts.userId, userId))
+    // Matches listCategories/listActiveAccounts: an archived account must
+    // disappear from its own list page the same way an archived category
+    // disappears from categories/page.tsx. Left unfiltered, an archived
+    // account stayed on /accounts, unlabelled, still showing a live Archive
+    // button that silently re-stamped archivedAt on every click.
+    .where(and(eq(accounts.userId, userId), isNull(accounts.archivedAt)))
     .orderBy(asc(accounts.sortOrder), asc(accounts.createdAt));
 
   return rows.map(({ account, delta }) => ({

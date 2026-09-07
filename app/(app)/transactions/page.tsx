@@ -36,6 +36,26 @@ function entries(count: number): string {
   return `${count} ${count === 1 ? "entry" : "entries"}`;
 }
 
+/**
+ * Whether any filter narrowed this query. `total === 0` alone cannot tell a
+ * genuinely empty ledger from a search that matched nothing — a payee search
+ * with no hits made `total` zero and told a user with a full ledger they had
+ * never recorded a transaction, the exact bug the comment below already
+ * warns about for the *pagination* case. Mirrors the fields FilterBar's own
+ * `active` check reads, computed server-side from the same normalised
+ * filters rather than duplicated from request search params.
+ */
+function hasActiveFilters(f: {
+  from?: string;
+  to?: string;
+  accountId?: string;
+  categoryId?: string;
+  type?: string;
+  q?: string;
+}): boolean {
+  return Boolean(f.from || f.to || f.accountId || f.categoryId || f.type || f.q);
+}
+
 export default async function TransactionsPage({
   searchParams,
 }: {
@@ -118,7 +138,9 @@ export default async function TransactionsPage({
         */}
         {total === 0 ? (
           <p className="text-muted-foreground">
-            No transactions yet. Add your first one.
+            {hasActiveFilters(filters)
+              ? "No transactions match these filters."
+              : "No transactions yet. Add your first one."}
           </p>
         ) : rows.length === 0 ? (
           <p className="text-muted-foreground">

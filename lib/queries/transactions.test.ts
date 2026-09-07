@@ -5,9 +5,10 @@ import {
   escapeLike,
   isCalendarDate,
   normaliseFilters,
+  pageOffset,
   type TxFilters,
 } from "./transactions.filters";
-import { buildTxWhere } from "./transactions.where";
+import { buildTxOrder, buildTxWhere } from "./transactions.where";
 
 describe("normaliseFilters", () => {
   it("defaults to page 1 with a 50-row page", () => {
@@ -262,5 +263,96 @@ describe("buildTxWhere", () => {
     const { sql, params } = compile({ q: "'; drop table transactions; --" });
     expect(sql).not.toContain("drop table");
     expect(params[1]).toBe("%'; drop table transactions; --%");
+  });
+});
+
+describe("buildTxOrder", () => {
+  const dialect = new PgDialect();
+
+  /**
+   * Same reasoning as buildTxWhere's own compile(): the column and direction
+   * chosen leave no trace in a plain equality check, so the only way to pin
+   * "amount picks amount_minor, not date" or "asc really emits asc" is to
+   * compile a query with it and read the SQL text back.
+   */
+  function compileOrder(f: Partial<TxFilters> = {}) {
+    const query = new QueryBuilder()
+      .select({ id: transactions.id })
+      .from(transactions)
+      .orderBy(
+        ...buildTxOrder({ page: 1, pageSize: 50, sort: "date", dir: "desc", ...f }),
+      );
+    return dialect.sqlToQuery(query.getSQL());
+  }
+
+  it("defaults to date, newest first, with createdAt as the tiebreaker", () => {
+    const { sql } = compileOrder();
+    expect(sql).toBe(
+      'select "id" from "transactions" order by "transactions"."date" desc, "transactions"."created_at" desc',
+    );
+  });
+
+  it("sorts by amount when asked", () => {
+    const { sql } = compileOrder({ sort: "amount", dir: "asc" });
+    expect(sql).toBe(
+      'select "id" from "transactions" order by "transactions"."amount_minor" asc, "transactions"."created_at" desc',
+    );
+  });
+
+  it("sorts by payee when asked", () => {
+    const { sql } = compileOrder({ sort: "payee", dir: "desc" });
+    expect(sql).toBe(
+      'select "id" from "transactions" order by "transactions"."payee" desc, "transactions"."created_at" desc',
+    );
+  });
+
+  it("keeps createdAt descending as the tiebreaker regardless of the primary direction", () => {
+    const { sql } = compileOrder({ sort: "date", dir: "asc" });
+    expect(sql).toBe(
+      'select "id" from "transactions" order by "transactions"."date" asc, "transactions"."created_at" desc',
+    );
+  });
+});
+
+describe("pageOffset and pagination", () => {
+  const dialect = new PgDialect();
+
+  it("page 1 offsets by zero", () => {
+    expect(pageOffset({ page: 1, pageSize: 50 })).toBe(0);
+  });
+
+  it("multiplies (page - 1) by pageSize", () => {
+    expect(pageOffset({ page: 3, pageSize: 20 })).toBe(40);
+    expect(pageOffset({ page: 2, pageSize: 1 })).toBe(1);
+  });
+
+  /**
+   * `.limit`/`.offset` are the two clauses that actually decide which page a
+   * user sees; swapping them, or feeding `page` where `pageSize` belongs,
+   * still returns 200 OK with plausible-looking rows, so the only way to pin
+   * the query itself (not just the arithmetic above) is the same
+   * compile-and-read-SQL technique used for the WHERE and ORDER BY clauses.
+   */
+  function compilePage(page: number, pageSize: number) {
+    const query = new QueryBuilder()
+      .select({ id: transactions.id })
+      .from(transactions)
+      .limit(pageSize)
+      .offset(pageOffset({ page, pageSize }));
+    return dialect.sqlToQuery(query.getSQL());
+  }
+
+  it("limits to the page size on page 1", () => {
+    // Drizzle omits the OFFSET clause entirely when it compiles to zero,
+    // rather than emitting a no-op "offset $n" with 0 bound — page 1 is the
+    // one case with no offset clause to read back at all.
+    const { sql, params } = compilePage(1, 50);
+    expect(sql).toBe('select "id" from "transactions" limit $1');
+    expect(params).toEqual([50]);
+  });
+
+  it("offsets by whole pages for a later page", () => {
+    const { params } = compilePage(3, 20);
+    expect(params).toEqual([20, 40]);
   });
 });

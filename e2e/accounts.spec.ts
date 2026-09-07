@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signUp } from "./helpers";
+import { signUp, addAccount } from "./helpers";
 
 test("create an account and see its opening balance", async ({ page }) => {
   await signUp(page);
@@ -53,4 +53,32 @@ test("a bad opening balance is rejected, not silently saved as zero", async ({
     "openingBalance-error",
   );
   await expect(page.getByText("Bad Balance Test")).not.toBeVisible();
+});
+
+test("archiving an account removes it from the accounts page and the transaction picker", async ({
+  page,
+}) => {
+  // Regression test for an Important finding: listAccountsWithBalance had no
+  // archivedAt filter, so an archived account stayed on /accounts,
+  // unlabelled, with a live Archive button that just re-stamped archivedAt.
+  await signUp(page);
+  await addAccount(page, "Checking", "0");
+  await page.goto("/accounts");
+  await page.getByRole("button", { name: "New account" }).click();
+  await page.getByLabel("Name").fill("Old Wallet");
+  await page.getByRole("button", { name: "Add account" }).click();
+  await expect(page.getByText("Old Wallet", { exact: true })).toBeVisible();
+
+  // Exact match: sonner's own "Old Wallet archived" toast otherwise makes
+  // this a second match for the plain substring and trips strict mode.
+  await page.getByRole("button", { name: "Archive Old Wallet" }).click();
+  await expect(page.getByText("Old Wallet", { exact: true })).toBeHidden();
+
+  await page.goto("/transactions");
+  await page.getByRole("button", { name: /New transaction|Add transaction/ }).click();
+  // Exact match: FilterBar's own "Accounts" filter (always on this page) has
+  // "Account" as a literal prefix, so a plain substring match resolves to
+  // both comboboxes and trips strict mode.
+  await page.getByLabel("Account", { exact: true }).click();
+  await expect(page.getByRole("option", { name: "Old Wallet" })).toHaveCount(0);
 });

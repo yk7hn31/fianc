@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { formatAmount } from "@/lib/money";
 import { CategoryIcon } from "@/components/category-icon";
 import {
@@ -30,7 +30,25 @@ export function TransactionTable({
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
+  /*
+   * Filtering, sorting, and paging are all soft navigations to the same
+   * route at the same position in the tree, so React keeps this component
+   * — and `selected` — mounted across them while `rows` is swapped out from
+   * under it. Left unchecked, three rows selected on page 1 stay "selected"
+   * after clicking Next, pointing at ids that are no longer rendered; a
+   * bulk delete from page 2 would then destroy page-1 rows the user cannot
+   * see and never re-confirmed. Deriving the *visible* selection as the
+   * intersection with the current `rows` — rather than trying to clear
+   * `selected` on every navigation — means the bar, the "select all"
+   * checkbox, and the delete action itself can never see a stale id.
+   */
+  const visibleSelected = useMemo(() => {
+    const ids = new Set(rows.map((r) => r.id));
+    return new Set([...selected].filter((id) => ids.has(id)));
+  }, [selected, rows]);
+
+  const allSelected =
+    rows.length > 0 && rows.every((r) => visibleSelected.has(r.id));
 
   function toggleAll() {
     setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)));
@@ -48,7 +66,7 @@ export function TransactionTable({
   return (
     <div className="hidden md:block">
       <SelectionBar
-        selected={[...selected]}
+        selected={[...visibleSelected]}
         onCleared={() => setSelected(new Set())}
       />
       <div className="overflow-hidden rounded-card border border-border bg-card shadow-card">
@@ -82,13 +100,13 @@ export function TransactionTable({
           </TableHeader>
           <TableBody>
             {rows.map((t) => (
-              <TableRow key={t.id} data-state={selected.has(t.id) ? "selected" : undefined}>
+              <TableRow key={t.id} data-state={visibleSelected.has(t.id) ? "selected" : undefined}>
                 <TableCell className="pl-4">
                   <input
                     type="checkbox"
                     aria-label={`Select ${t.payee || t.categoryName || "transaction"}`}
                     className="size-4 rounded-small border-border accent-foreground"
-                    checked={selected.has(t.id)}
+                    checked={visibleSelected.has(t.id)}
                     onChange={() => toggleOne(t.id)}
                   />
                 </TableCell>

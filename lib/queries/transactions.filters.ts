@@ -62,6 +62,17 @@ export function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
+/**
+ * The list query's OFFSET, in one place so the arithmetic that turns a page
+ * number into a row offset is the same expression in the query and in its
+ * test — `(page - 1) * pageSize` inlined separately in each would let the two
+ * drift, and a wrong offset returns the wrong page silently rather than
+ * erroring.
+ */
+export function pageOffset(f: Pick<TxFilters, "page" | "pageSize">): number {
+  return (f.page - 1) * f.pageSize;
+}
+
 function date(v: unknown): string | undefined {
   return typeof v === "string" && isCalendarDate(v) ? v : undefined;
 }

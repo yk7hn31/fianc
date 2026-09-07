@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   accounts,
@@ -7,15 +7,15 @@ import {
   transactions,
   type Transaction,
 } from "@/lib/db/schema";
-import type { TxFilters } from "./transactions.filters";
-import { buildTxWhere } from "./transactions.where";
+import { pageOffset, type TxFilters } from "./transactions.filters";
+import { buildTxOrder, buildTxWhere } from "./transactions.where";
 
 export type { TxFilters };
 export { normaliseFilters } from "./transactions.filters";
 // Re-exported rather than defined here so this module stays the single import
-// site for the list query while the clause itself remains testable; see the
-// note in transactions.where.ts.
-export { buildTxWhere };
+// site for the list query while the clauses themselves remain testable; see
+// the note in transactions.where.ts.
+export { buildTxOrder, buildTxWhere };
 
 export type TxRow = Transaction & {
   categoryName: string | null;
@@ -28,14 +28,6 @@ export async function listTransactions(
   f: TxFilters,
 ): Promise<{ rows: TxRow[]; total: number }> {
   const clause = buildTxWhere(userId, f);
-
-  const column =
-    f.sort === "amount"
-      ? transactions.amountMinor
-      : f.sort === "payee"
-        ? transactions.payee
-        : transactions.date;
-  const order = f.dir === "asc" ? asc : desc;
 
   const rows = await db
     .select({
@@ -50,12 +42,9 @@ export async function listTransactions(
     // a transfer always are.
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
     .where(clause)
-    // Same-day (or same-amount, same-payee) rows would otherwise come back in
-    // whatever order the plan produced; createdAt keeps the newest entry on
-    // top as the tiebreaker regardless of the primary sort.
-    .orderBy(order(column), desc(transactions.createdAt))
+    .orderBy(...buildTxOrder(f))
     .limit(f.pageSize)
-    .offset((f.page - 1) * f.pageSize);
+    .offset(pageOffset(f));
 
   const [{ value: total }] = await db
     .select({ value: count() })
