@@ -11,7 +11,7 @@ import { pageOffset, type TxFilters } from "./transactions.filters";
 import { buildTxOrder, buildTxWhere } from "./transactions.where";
 
 export type { TxFilters };
-export { normaliseFilters } from "./transactions.filters";
+export { normaliseFilters, filtersToQuery } from "./transactions.filters";
 // Re-exported rather than defined here so this module stays the single import
 // site for the list query while the clauses themselves remain testable; see
 // the note in transactions.where.ts.

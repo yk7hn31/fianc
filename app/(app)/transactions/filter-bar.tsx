@@ -16,6 +16,13 @@ import type { Account, Category } from "@/lib/db/schema";
 
 const ANY = "__any";
 
+const TYPE_LABELS: Record<string, string> = {
+  [ANY]: "All types",
+  income: "Income",
+  expense: "Expense",
+  transfer: "Transfer",
+};
+
 export function FilterBar({
   accounts,
   categories,
@@ -25,6 +32,23 @@ export function FilterBar({
 }) {
   const router = useRouter();
   const params = useSearchParams();
+
+  /*
+   * Base UI resolves a *closed* trigger's text from `items`, not from the
+   * mounted options — the popup has not rendered yet, so
+   * `resolveSelectedLabel` falls through to stringifying the raw value.
+   * Without these maps every one of these triggers reads "__any" when no
+   * filter is set, and a raw uuid once one is. Same maps, same reason, as
+   * TransactionForm and RowActions.
+   */
+  const accountLabels: Record<string, string> = {
+    [ANY]: "All accounts",
+    ...Object.fromEntries(accounts.map((a) => [a.id, a.name])),
+  };
+  const categoryLabels: Record<string, string> = {
+    [ANY]: "All categories",
+    ...Object.fromEntries(categories.map((c) => [c.id, c.name])),
+  };
 
   function set(key: string, value: string) {
     const next = new URLSearchParams(params);
@@ -97,6 +121,7 @@ export function FilterBar({
       <div className="space-y-1.5">
         <Label htmlFor="filterAccountId">Accounts</Label>
         <Select
+          items={accountLabels}
           value={params.get("accountId") ?? ANY}
           onValueChange={(v) => set("accountId", String(v))}
         >
@@ -113,6 +138,7 @@ export function FilterBar({
       <div className="space-y-1.5">
         <Label htmlFor="filterCategoryId">Categories</Label>
         <Select
+          items={categoryLabels}
           value={params.get("categoryId") ?? ANY}
           onValueChange={(v) => set("categoryId", String(v))}
         >
@@ -122,6 +148,36 @@ export function FilterBar({
             {categories.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/*
+        Spec: "Filters for date range, account, category, type, and free
+        text." `normaliseFilters` and `buildTxWhere` have always understood
+        `type` — and FilterBar's own `active` check has always listed it —
+        but nothing on screen ever set it, so the filter was reachable only
+        by hand-editing the URL.
+
+        "Types", not "Type": TransactionForm labels its expense/income/
+        transfer tablist "Type", and Base UI's Dialog leaves the rest of the
+        page in the accessibility tree, so an identical name here would be a
+        second match while that dialog is open. Same reasoning, and the same
+        plural, as the Accounts and Categories filters above.
+      */}
+      <div className="space-y-1.5">
+        <Label htmlFor="filterType">Types</Label>
+        <Select
+          items={TYPE_LABELS}
+          value={params.get("type") ?? ANY}
+          onValueChange={(v) => set("type", String(v))}
+        >
+          <SelectTrigger id="filterType" className="h-11"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ANY}>All types</SelectItem>
+            <SelectItem value="income">Income</SelectItem>
+            <SelectItem value="expense">Expense</SelectItem>
+            <SelectItem value="transfer">Transfer</SelectItem>
           </SelectContent>
         </Select>
       </div>

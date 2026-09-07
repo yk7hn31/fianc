@@ -1,8 +1,12 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Plus, Wallet } from "lucide-react";
+import { ChevronLeft, Plus, Wallet } from "lucide-react";
 import { requireUser } from "@/lib/auth/guard";
-import { listTransactions, normaliseFilters } from "@/lib/queries/transactions";
+import {
+  listTransactions,
+  normaliseFilters,
+  filtersToQuery,
+} from "@/lib/queries/transactions";
 import { listActiveAccounts } from "@/lib/queries/accounts";
 import { listCategories } from "@/lib/queries/categories";
 import { AppHeader } from "@/components/app-shell/app-header";
@@ -63,6 +67,8 @@ export default async function TransactionsPage({
 }) {
   const user = await requireUser();
   const filters = normaliseFilters(firstValues(await searchParams));
+  const query = filtersToQuery(filters);
+  const backToFirstPage = query ? `/transactions?${query}` : "/transactions";
   const [{ rows, total }, accounts, categories] = await Promise.all([
     listTransactions(user.id, filters),
     listActiveAccounts(user.id),
@@ -143,10 +149,30 @@ export default async function TransactionsPage({
               : "No transactions yet. Add your first one."}
           </p>
         ) : rows.length === 0 ? (
-          <p className="text-muted-foreground">
-            Nothing on page {filters.page}. The list has {entries(total)}, on
-            earlier pages.
-          </p>
+          <div className="space-y-3">
+            <p className="text-muted-foreground">
+              Nothing on page {filters.page}. The list has {entries(total)}, on
+              earlier pages.
+            </p>
+            {/*
+              This branch is outside the one that renders <Pagination>, so
+              there is no Previous button here and an out-of-range ?page= had
+              no way back but editing the URL. The link keeps every active
+              filter — rebuilt from the normalised filters, so going back to
+              page one does not also silently clear the search the user is in
+              the middle of.
+            */}
+            <Link
+              href={backToFirstPage}
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "h-11 gap-1.5 px-4",
+              )}
+            >
+              <ChevronLeft className="size-4" strokeWidth={1.5} />
+              Back to page 1
+            </Link>
+          </div>
         ) : (
           <>
             <TransactionList

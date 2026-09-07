@@ -3,6 +3,7 @@ import { PgDialect, QueryBuilder } from "drizzle-orm/pg-core";
 import { transactions } from "@/lib/db/schema";
 import {
   escapeLike,
+  filtersToQuery,
   isCalendarDate,
   normaliseFilters,
   pageOffset,
@@ -354,5 +355,77 @@ describe("pageOffset and pagination", () => {
   it("offsets by whole pages for a later page", () => {
     const { params } = compilePage(3, 20);
     expect(params).toEqual([20, 40]);
+  });
+});
+
+describe("filtersToQuery", () => {
+  it("is empty when nothing is filtered", () => {
+    expect(filtersToQuery(normaliseFilters({}))).toBe("");
+  });
+
+  it("never carries the page number — that is the whole point", () => {
+    expect(filtersToQuery(normaliseFilters({ page: "97" }))).toBe("");
+  });
+
+  it("keeps every active filter", () => {
+    const accountId = "11111111-2222-3333-4444-555555555555";
+    const categoryId = "66666666-7777-8888-9999-aaaaaaaaaaaa";
+    const query = filtersToQuery(
+      normaliseFilters({
+        page: "97",
+        from: "2026-01-01",
+        to: "2026-01-31",
+        accountId,
+        categoryId,
+        type: "expense",
+        q: "coffee",
+        pageSize: "10",
+        sort: "amount",
+        dir: "asc",
+      }),
+    );
+    const params = new URLSearchParams(query);
+    expect(params.get("page")).toBeNull();
+    expect(params.get("from")).toBe("2026-01-01");
+    expect(params.get("to")).toBe("2026-01-31");
+    expect(params.get("accountId")).toBe(accountId);
+    expect(params.get("categoryId")).toBe(categoryId);
+    expect(params.get("type")).toBe("expense");
+    expect(params.get("q")).toBe("coffee");
+    expect(params.get("pageSize")).toBe("10");
+    expect(params.get("sort")).toBe("amount");
+    expect(params.get("dir")).toBe("asc");
+  });
+
+  it("escapes a search term that would otherwise break the query string", () => {
+    const query = filtersToQuery(normaliseFilters({ q: "50% & more?" }));
+    expect(new URLSearchParams(query).get("q")).toBe("50% & more?");
+  });
+
+  it("drops values that are already the default", () => {
+    const query = filtersToQuery(
+      normaliseFilters({ pageSize: "50", sort: "date", dir: "desc" }),
+    );
+    expect(query).toBe("");
+  });
+
+  // The property the "Back to page 1" link depends on: following it must land
+  // on the same filtered view, only at page one.
+  it("round-trips through normaliseFilters with the page reset", () => {
+    const filters = normaliseFilters({
+      page: "97",
+      from: "2026-01-01",
+      to: "2026-01-31",
+      accountId: "11111111-2222-3333-4444-555555555555",
+      type: "income",
+      q: "rent",
+      pageSize: "10",
+      sort: "payee",
+      dir: "asc",
+    });
+    const back = normaliseFilters(
+      Object.fromEntries(new URLSearchParams(filtersToQuery(filters))),
+    );
+    expect(back).toEqual({ ...filters, page: 1 });
   });
 });

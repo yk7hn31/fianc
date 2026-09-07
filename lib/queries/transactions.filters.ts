@@ -26,6 +26,15 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_PAGE = 1_000_000;
 
 /**
+ * The values `normaliseFilters` falls back to. Named, because
+ * `filtersToQuery` below has to know which values are defaults in order to
+ * leave them out of the URL, and two independent copies of "50" would drift.
+ */
+const DEFAULT_PAGE_SIZE = 50;
+const DEFAULT_SORT: TxFilters["sort"] = "date";
+const DEFAULT_DIR: TxFilters["dir"] = "desc";
+
+/**
  * Whether a string is a date that actually exists on the calendar.
  *
  * The shape check alone is not enough, and neither is adding `Date.parse`:
@@ -100,7 +109,11 @@ export function normaliseFilters(
   );
   const pageSize = Math.min(
     200,
-    Math.max(1, Number.parseInt(input.pageSize ?? "50", 10) || 50),
+    Math.max(
+      1,
+      Number.parseInt(input.pageSize ?? String(DEFAULT_PAGE_SIZE), 10) ||
+        DEFAULT_PAGE_SIZE,
+    ),
   );
 
   const q = input.q?.trim();
@@ -119,7 +132,38 @@ export function normaliseFilters(
     page,
     pageSize,
     sort:
-      input.sort === "amount" || input.sort === "payee" ? input.sort : "date",
-    dir: input.dir === "asc" ? "asc" : "desc",
+      input.sort === "amount" || input.sort === "payee"
+        ? input.sort
+        : DEFAULT_SORT,
+    dir: input.dir === "asc" ? "asc" : DEFAULT_DIR,
   };
+}
+
+/**
+ * Normalised filters back into a query string, deliberately without `page`.
+ *
+ * This is what lets "Back to page 1" keep the search, the date range and the
+ * sort the user had set: an out-of-range `?page=` renders no rows and so no
+ * pager, which left editing the URL by hand as the only way back. Rebuilt
+ * from the normalised filters rather than echoed from the raw request, so
+ * unrecognised or malformed params are dropped rather than carried forward,
+ * and values equal to the defaults are omitted to keep the link short.
+ *
+ * Round-trips: `normaliseFilters` of this output is the input again, page
+ * reset to 1. The test asserts exactly that.
+ */
+export function filtersToQuery(f: TxFilters): string {
+  const params = new URLSearchParams();
+  if (f.from) params.set("from", f.from);
+  if (f.to) params.set("to", f.to);
+  if (f.accountId) params.set("accountId", f.accountId);
+  if (f.categoryId) params.set("categoryId", f.categoryId);
+  if (f.type) params.set("type", f.type);
+  if (f.q) params.set("q", f.q);
+  if (f.pageSize !== DEFAULT_PAGE_SIZE) {
+    params.set("pageSize", String(f.pageSize));
+  }
+  if (f.sort !== DEFAULT_SORT) params.set("sort", f.sort);
+  if (f.dir !== DEFAULT_DIR) params.set("dir", f.dir);
+  return params.toString();
 }
