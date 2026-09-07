@@ -1,4 +1,10 @@
+import { config as loadEnv } from "dotenv";
 import { defineConfig, devices } from "@playwright/test";
+
+// The Playwright runner is a plain Node process; only the `next dev` child it
+// spawns reads .env.local on its own. e2e/auth.spec.ts needs SIGNUP_CODE in the
+// runner itself to fill the signup form, so load it here too.
+loadEnv({ path: ".env.local", quiet: true });
 
 export default defineConfig({
   testDir: "./e2e",
