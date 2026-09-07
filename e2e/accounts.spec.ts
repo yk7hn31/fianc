@@ -42,11 +42,15 @@ test("a bad opening balance is rejected, not silently saved as zero", async ({
   await page.getByLabel("Opening balance").fill("12.345");
   await page.getByRole("button", { name: "Add account" }).click();
 
-  // The form only ever surfaces a generic top-level message via a toast
-  // (see account-form.tsx's useEffect) — field-level detail lives in
-  // fieldErrors, which this form does not render. Either way, rejection
-  // must be visible and the account must not silently land with a balance
-  // of zero.
+  // Rejection has to be visible, the specific reason has to reach the user,
+  // and the account must not silently land with a balance of zero.
   await expect(page.getByText("Check the form")).toBeVisible();
+  const fieldError = page.locator("#openingBalance-error");
+  await expect(fieldError).toBeVisible();
+  await expect(fieldError).not.toBeEmpty();
+  await expect(page.getByLabel("Opening balance")).toHaveAttribute(
+    "aria-describedby",
+    "openingBalance-error",
+  );
   await expect(page.getByText("Bad Balance Test")).not.toBeVisible();
 });

@@ -3,9 +3,8 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { FormField, fieldErrorReader } from "@/components/form-field";
 import type { ActionResult } from "@/lib/action-result";
 
 type Action = (
@@ -27,8 +26,7 @@ export function AuthForm({
   // attempt is the behaviour we want.
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const fieldError = (k: string) =>
-    state && !state.ok ? state.fieldErrors?.[k]?.[0] : undefined;
+  const fieldError = fieldErrorReader(state);
 
   return (
     <Card className="w-full max-w-sm">
@@ -44,24 +42,24 @@ export function AuthForm({
 
         <form action={formAction} aria-busy={pending} className="space-y-3">
           {mode === "signup" && (
-            <Field
+            <FormField
               label="Name"
               name="name"
               value={name}
-              onValueChange={setName}
+              onChange={(e) => setName(e.target.value)}
               error={fieldError("name")}
             />
           )}
-          <Field
+          <FormField
             label="Email"
             name="email"
             type="email"
             autoComplete="email"
             value={email}
-            onValueChange={setEmail}
+            onChange={(e) => setEmail(e.target.value)}
             error={fieldError("email")}
           />
-          <Field
+          <FormField
             label="Password"
             name="password"
             type="password"
@@ -71,7 +69,7 @@ export function AuthForm({
             error={fieldError("password")}
           />
           {mode === "signup" && (
-            <Field label="Signup code" name="code" error={fieldError("code")} />
+            <FormField label="Signup code" name="code" error={fieldError("code")} />
           )}
 
           {state && !state.ok && (
@@ -98,49 +96,5 @@ export function AuthForm({
         </p>
       </CardContent>
     </Card>
-  );
-}
-
-function Field({
-  label,
-  name,
-  type = "text",
-  autoComplete,
-  value,
-  onValueChange,
-  error,
-}: {
-  label: string;
-  name: string;
-  type?: string;
-  autoComplete?: string;
-  value?: string;
-  onValueChange?: (value: string) => void;
-  error?: string;
-}) {
-  const errorId = `${name}-error`;
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={name}>{label}</Label>
-      <Input
-        id={name}
-        name={name}
-        type={type}
-        autoComplete={autoComplete}
-        aria-invalid={Boolean(error)}
-        // Without this a screen reader announces the field as invalid but
-        // never reads why — the reason sits in a sibling paragraph.
-        aria-describedby={error ? errorId : undefined}
-        {...(onValueChange
-          ? { value, onChange: (e) => onValueChange(e.target.value) }
-          : {})}
-        className="h-11"
-      />
-      {error && (
-        <p id={errorId} className="text-destructive text-caption">
-          {error}
-        </p>
-      )}
-    </div>
   );
 }

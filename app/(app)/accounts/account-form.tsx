@@ -4,8 +4,11 @@ import { useActionState, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  FieldShell,
+  FormField,
+  fieldErrorReader,
+} from "@/components/form-field";
 import {
   Select,
   SelectContent,
@@ -29,6 +32,8 @@ export function AccountForm() {
     }
   }, [state]);
 
+  const fieldError = fieldErrorReader(state);
+
   return (
     <ResponsiveDialog
       open={open}
@@ -42,13 +47,10 @@ export function AccountForm() {
         </Button>
       }
     >
-      <form action={formAction} className="space-y-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="name">Name</Label>
-          <Input id="name" name="name" className="h-11" />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="type">Type</Label>
+      <form action={formAction} aria-busy={pending} className="space-y-3">
+        <FormField label="Name" name="name" error={fieldError("name")} />
+
+        <FieldShell label="Type" name="type" error={fieldError("type")}>
           <Select name="type" defaultValue="checking">
             <SelectTrigger id="type" className="h-11">
               <SelectValue />
@@ -61,17 +63,16 @@ export function AccountForm() {
               <SelectItem value="investment">Investment</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="openingBalance">Opening balance</Label>
-          <Input
-            id="openingBalance"
-            name="openingBalance"
-            inputMode="decimal"
-            placeholder="0.00"
-            className="h-11"
-          />
-        </div>
+        </FieldShell>
+
+        <FormField
+          label="Opening balance"
+          name="openingBalance"
+          inputMode="decimal"
+          placeholder="0.00"
+          error={fieldError("openingBalance")}
+        />
+
         <Button type="submit" className="w-full h-11" disabled={pending}>
           {pending ? "Saving…" : "Add account"}
         </Button>
