@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signUp, addAccount, addExpense } from "./helpers";
+import { signUp, addAccount, addExpense, addIncome } from "./helpers";
 
 /**
  * The mobile list and the desktop table render the same row in two DOM
@@ -9,6 +9,16 @@ import { signUp, addAccount, addExpense } from "./helpers";
  */
 function visible(page: import("@playwright/test").Page, text: string) {
   return page.getByText(text).filter({ visible: true });
+}
+
+/**
+ * A row's "…" trigger, scoped to <main>. The mobile bottom bar now has its
+ * own button named "More" — the tab that opens the sheet of secondary nav
+ * items — so an unscoped `name: /Actions|More/` is genuinely ambiguous and
+ * only picked the right one by DOM order.
+ */
+function rowActions(page: import("@playwright/test").Page, name: RegExp) {
+  return page.locator("main").getByRole("button", { name }).first();
 }
 
 test("edit a transaction's amount", async ({ page }) => {
@@ -22,7 +32,7 @@ test("edit a transaction's amount", async ({ page }) => {
   // both named "Amount" and tripping strict mode.
   await expect(page.locator("#amount")).toHaveCount(0);
 
-  await page.getByRole("button", { name: /Actions for Bakery|More/ }).first().click();
+  await rowActions(page, /Actions for Bakery/).click();
   await page.getByRole("menuitem", { name: "Edit" }).click();
   await page.getByLabel("Amount").fill("15.00");
   await page.getByRole("button", { name: /Save/ }).click();
@@ -60,7 +70,7 @@ test("deleting one half of a transfer deletes both", async ({ page }) => {
   await page.getByRole("option", { name: "Savings" }).click();
   await page.getByRole("button", { name: "Save transaction" }).click();
 
-  await page.getByRole("button", { name: /Actions|More/ }).first().click();
+  await rowActions(page, /Actions/).click();
   // Delete is confirmed with a native confirm() — it destroys a financial
   // record permanently, and Playwright dismisses unhandled dialogs by
   // default, which would otherwise silently no-op this click.
@@ -94,7 +104,7 @@ test("editing a transfer's amount moves both legs and both balances", async ({
   await page.getByRole("button", { name: "Save transaction" }).click();
   await expect(page.locator("#amount")).toHaveCount(0);
 
-  await page.getByRole("button", { name: /Actions|More/ }).first().click();
+  await rowActions(page, /Actions/).click();
   await page.getByRole("menuitem", { name: "Edit" }).click();
   await page.getByLabel("Amount").fill("150.00");
   await page.getByRole("button", { name: /Save/ }).click();
@@ -167,4 +177,79 @@ test("selecting rows then changing page clears the stale selection", async ({
   await page.waitForURL(/page=2/);
 
   await expect(page.getByText(/selected/)).toHaveCount(0);
+});
+
+test("the edit dialog says which field was rejected, not just \"check the form\"", async ({
+  page,
+}) => {
+  // Regression test for an Important finding: this form hand-rolled its
+  // Label + Input + error paragraph and rendered a message for `amount`
+  // only, so a rejected date, account, category, payee or note produced a
+  // bare "Check the form" toast with nothing on screen saying which.
+  await signUp(page);
+  await addAccount(page, "Checking", "1000");
+  await addExpense(page, "10.00", "Bakery");
+  await expect(page.locator("#amount")).toHaveCount(0);
+
+  await rowActions(page, /Actions for Bakery/).click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
+  await page.getByLabel("Date").fill("");
+  await page.getByRole("button", { name: /Save/ }).click();
+
+  const date = page.getByLabel("Date");
+  await expect(page.locator("#date-error")).toHaveText("Choose a date");
+  await expect(date).toHaveAttribute("aria-invalid", "true");
+  // The message is wired to the field, not merely next to it: without this a
+  // screen reader announces "invalid" and never reads why.
+  await expect(date).toHaveAttribute("aria-describedby", "date-error");
+});
+
+test("filter by type", async ({ page }) => {
+  // The spec requires a type filter. `normaliseFilters` and `buildTxWhere`
+  // understood `type` from the start, but no control ever set it.
+  await signUp(page);
+  await addAccount(page, "Checking", "1000");
+  await addExpense(page, "10.00", "Bakery");
+  await addIncome(page, "500.00", "Payday");
+
+  await page.goto("/transactions");
+  // Base UI resolves a closed trigger's text from the `items` map, not from
+  // the unmounted options, so without one every filter here reads "__any".
+  // `toContainText`, not `toHaveText`: the trigger also renders the select's
+  // own chevron glyph.
+  await expect(page.getByLabel("Types")).toContainText("All types");
+  await expect(page.getByLabel("Accounts")).toContainText("All accounts");
+  await expect(page.getByLabel("Categories")).toContainText("All categories");
+
+  await page.getByLabel("Types").click();
+  await page.getByRole("option", { name: "Income" }).click();
+  await page.waitForURL(/type=income/);
+
+  await expect(visible(page, "Payday")).toBeVisible();
+  await expect(visible(page, "Bakery")).toBeHidden();
+});
+
+test("an out-of-range page offers a way back that keeps the filters", async ({
+  page,
+}) => {
+  // Regression test for an Important finding: the "Nothing on page N" branch
+  // sits outside the one that renders <Pagination>, so there was no Previous
+  // button and the only escape was editing the URL by hand.
+  await signUp(page);
+  await addAccount(page, "Checking", "1000");
+  await addExpense(page, "10.00", "Bakery");
+  await addExpense(page, "20.00", "Hardware");
+
+  await page.goto("/transactions?q=Bakery&page=9");
+  await expect(page.getByText(/Nothing on page 9/)).toBeVisible();
+
+  await page.getByRole("link", { name: "Back to page 1" }).click();
+  // Link.click() only dispatches the click; the client-side transition lands
+  // afterwards.
+  await page.waitForURL(/q=Bakery/);
+  await expect(page).not.toHaveURL(/[?&]page=/);
+
+  // The search survived the trip — the whole point of the link.
+  await expect(visible(page, "Bakery")).toBeVisible();
+  await expect(visible(page, "Hardware")).toBeHidden();
 });

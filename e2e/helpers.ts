@@ -58,3 +58,18 @@ export async function addExpense(page: Page, amount: string, payee: string) {
   // `waitFor` throws a strict-mode violation before ever checking visibility.
   await page.getByText(payee).filter({ visible: true }).waitFor();
 }
+
+/**
+ * The income counterpart of `addExpense`, filed under the one seeded income
+ * category (Salary). Switching the type tab is what makes the row an income
+ * row — `type` is a hidden field driven by that tab, not by the category.
+ */
+export async function addIncome(page: Page, amount: string, payee: string) {
+  await page.goto("/transactions");
+  await page.getByRole("button", { name: /New transaction|Add transaction/ }).click();
+  await page.getByRole("tab", { name: "Income" }).click();
+  await page.getByLabel("Amount").fill(amount);
+  await page.getByLabel("Payee").fill(payee);
+  await page.getByRole("button", { name: "Save transaction" }).click();
+  await page.getByText(payee).filter({ visible: true }).waitFor();
+}
