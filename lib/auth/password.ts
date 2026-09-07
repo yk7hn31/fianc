@@ -35,3 +35,28 @@ export async function verifyPassword(
     return false;
   }
 }
+
+/**
+ * An argon2id hash of 32 random bytes nobody kept, written with exactly the
+ * parameters in `HASH_OPTIONS` above.
+ *
+ * Login must do the same work whether or not the email exists. Returning
+ * early for an unknown email made the two branches take ~52ms and ~0ms, so
+ * the deliberately identical "Email or password is incorrect" message was
+ * defeated by a stopwatch and the login form became an account-enumeration
+ * oracle. Verifying against this instead spends the same time on the
+ * unknown-email path.
+ *
+ * A literal, not a hash computed at import: generating one on module load
+ * costs a real argon2 run at every cold start, and pinning the string is what
+ * makes the cost parameters checkable — `password.test.ts` parses them back
+ * out and asserts they match `HASH_OPTIONS`, because a dummy hashed more
+ * cheaply than the real ones reopens the same timing gap it exists to close.
+ */
+export const DUMMY_HASH =
+  "$argon2id$v=19$m=65536,t=3,p=1$cvcxC47bN+rMUsD5Sysq6A$6w4gQqwkM9LpZOmCgbT45Xg6M1vdanpa46YLwBJG1RA";
+
+/** Always false. Call it to spend a verify's worth of time. */
+export function verifyDummyPassword(plain: string): Promise<boolean> {
+  return verifyPassword(DUMMY_HASH, plain);
+}

@@ -5,7 +5,11 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import {
+  hashPassword,
+  verifyPassword,
+  verifyDummyPassword,
+} from "@/lib/auth/password";
 import {
   createSession,
   destroySession,
@@ -100,9 +104,16 @@ export async function login(
       .where(eq(users.email, email))
       .limit(1);
 
-    // One message for both branches: do not reveal which emails exist.
+    // One message for both branches: do not reveal which emails exist. The
+    // message alone was not enough — an unknown email returned immediately
+    // while a known one paid for an argon2 verify, so the two were ~52ms
+    // apart and trivially told apart with a stopwatch. Hashing against a
+    // dummy makes both paths do the same work.
     const invalid = fail("Email or password is incorrect");
-    if (!user) return invalid;
+    if (!user) {
+      await verifyDummyPassword(password);
+      return invalid;
+    }
     if (!(await verifyPassword(user.passwordHash, password))) return invalid;
 
     await purgeExpiredSessions();

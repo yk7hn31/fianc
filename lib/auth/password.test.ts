@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { hash, parseOptions, type Options } from "@node-rs/argon2";
-import { hashPassword, verifyPassword } from "./password";
+import {
+  hashPassword,
+  verifyPassword,
+  verifyDummyPassword,
+  DUMMY_HASH,
+} from "./password";
 
 describe("password", () => {
   it("produces an argon2id hash, not the plaintext", async () => {
@@ -49,5 +54,30 @@ describe("password", () => {
 
   it("returns false rather than throwing on a malformed hash", async () => {
     await expect(verifyPassword("not-a-hash", "whatever")).resolves.toBe(false);
+  });
+});
+
+describe("verifyDummyPassword", () => {
+  // Regression test for a timing oracle: `login` used to return immediately
+  // when the email was unknown and pay for a full argon2 verify when it was
+  // known, so the two branches' identical error message was defeated by
+  // measuring how long the response took.
+  it("never matches, whatever it is given", async () => {
+    expect(await verifyDummyPassword("")).toBe(false);
+    expect(await verifyDummyPassword("correct horse battery staple")).toBe(
+      false,
+    );
+  });
+
+  it("costs the same as a real verify", async () => {
+    // The point is the work, not the answer: a dummy hashed with cheaper
+    // parameters than the real ones would still leave a measurable gap
+    // between the known-email and unknown-email paths.
+    const real = parseOptions(await hashPassword("cost-parameter-probe"));
+    const dummy = parseOptions(DUMMY_HASH);
+    expect(dummy.algorithm).toBe(real.algorithm);
+    expect(dummy.memoryCost).toBe(real.memoryCost);
+    expect(dummy.timeCost).toBe(real.timeCost);
+    expect(dummy.parallelism).toBe(real.parallelism);
   });
 });
