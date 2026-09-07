@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_ITEMS } from "./nav-items";
+import { NAV_ITEMS, isNavItemActive } from "./nav-items";
 import { cn } from "@/lib/utils";
 
 export function SidebarNav({ userName }: { userName: string }) {
@@ -13,9 +13,9 @@ export function SidebarNav({ userName }: { userName: string }) {
       <div className="px-2 py-3">
         <span className="text-subheading font-semibold tracking-tight">fianc</span>
       </div>
-      <nav className="flex flex-col gap-1 mt-2">
+      <nav aria-label="Primary" className="flex flex-col gap-1 mt-2">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = pathname.startsWith(href);
+          const active = isNavItemActive(pathname, href);
           return (
             <Link
               key={href}

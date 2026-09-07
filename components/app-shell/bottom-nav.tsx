@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
-import { NAV_ITEMS } from "./nav-items";
+import { NAV_ITEMS, isNavItemActive } from "./nav-items";
 import { cn } from "@/lib/utils";
 
 export function BottomNav() {
@@ -15,9 +15,19 @@ export function BottomNav() {
       aria-label="Primary"
       className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-paper border-t border-border pb-[env(safe-area-inset-bottom)]"
     >
-      <ul className="grid grid-cols-4">
+      {/*
+        Derived, not a literal grid-cols-4: the cell count is the primary items
+        plus "More", and flipping one NAV_ITEMS entry to primary would
+        otherwise wrap a fifth cell onto its own row without a word.
+      */}
+      <ul
+        className="grid"
+        style={{
+          gridTemplateColumns: `repeat(${primary.length + 1}, minmax(0, 1fr))`,
+        }}
+      >
         {primary.map(({ href, label, icon: Icon }) => {
-          const active = pathname.startsWith(href);
+          const active = isNavItemActive(pathname, href);
           return (
             <li key={href}>
               <Link

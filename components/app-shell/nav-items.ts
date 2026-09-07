@@ -24,3 +24,12 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/categories", label: "Categories", icon: Tags, primary: false },
   { href: "/settings", label: "Settings", icon: Settings, primary: false },
 ];
+
+/**
+ * Segment-aware, so /transactions/123 lights Transactions while a future
+ * sibling like /settings2 cannot light Settings. A bare startsWith() is safe
+ * only by coincidence of today's href list.
+ */
+export function isNavItemActive(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
