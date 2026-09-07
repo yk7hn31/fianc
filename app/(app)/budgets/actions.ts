@@ -37,19 +37,23 @@ export async function setBudget(formData: FormData): Promise<ActionResult> {
   const money = parseAmount(amount === "" ? "0" : amount);
   if (!money.ok) return fail(money.error);
 
-  await db
-    .insert(budgets)
-    .values({
-      userId: user.id,
-      categoryId,
-      month: `${month}-01`,
-      amountMinor: money.value,
-      rollover: rollover === "on",
-    })
-    .onConflictDoUpdate({
-      target: [budgets.userId, budgets.categoryId, budgets.month],
-      set: { amountMinor: money.value, rollover: rollover === "on" },
-    });
+  try {
+    await db
+      .insert(budgets)
+      .values({
+        userId: user.id,
+        categoryId,
+        month: `${month}-01`,
+        amountMinor: money.value,
+        rollover: rollover === "on",
+      })
+      .onConflictDoUpdate({
+        target: [budgets.userId, budgets.categoryId, budgets.month],
+        set: { amountMinor: money.value, rollover: rollover === "on" },
+      });
+  } catch {
+    return fail("Could not save the budget. Try again.");
+  }
 
   revalidatePath("/budgets");
   revalidatePath("/dashboard");
@@ -62,13 +66,17 @@ export async function copyLastMonth(month: string): Promise<ActionResult> {
   if (!/^\d{4}-\d{2}$/.test(month)) return fail("Bad month");
   const previous = addMonths(month, -1);
 
-  await db.execute(sql`
-    insert into budgets (user_id, category_id, month, amount_minor, rollover)
-    select user_id, category_id, ${`${month}-01`}::date, amount_minor, rollover
-    from budgets
-    where user_id = ${user.id} and month = ${`${previous}-01`}::date
-    on conflict (user_id, category_id, month) do nothing
-  `);
+  try {
+    await db.execute(sql`
+      insert into budgets (user_id, category_id, month, amount_minor, rollover)
+      select user_id, category_id, ${`${month}-01`}::date, amount_minor, rollover
+      from budgets
+      where user_id = ${user.id} and month = ${`${previous}-01`}::date
+      on conflict (user_id, category_id, month) do nothing
+    `);
+  } catch {
+    return fail("Could not copy last month. Try again.");
+  }
 
   revalidatePath("/budgets");
   return ok();

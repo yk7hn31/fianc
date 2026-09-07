@@ -12,6 +12,7 @@ import { StatBlock } from "@/components/stat-block";
 import { AddFabTrigger } from "@/components/app-shell/add-fab";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { BudgetProgressBar } from "@/components/budget-progress-bar";
 import { TransactionForm } from "../transactions/transaction-form";
 import { TransactionList } from "../transactions/transaction-list";
 import { TransactionTable } from "../transactions/transaction-table";
@@ -38,7 +39,19 @@ export default async function DashboardPage({
     ]);
 
   const net = totals.incomeMinor - totals.expenseMinor;
-  const budgetRemaining = budgetRows.reduce((sum, r) => sum + r.remainingMinor, 0);
+  // A category with no budget row this month (and no carry from a rollover
+  // month) reads remainingMinor as -spentMinor — real spend, but not an
+  // overrun of anything the user actually budgeted. Summing that into
+  // "Budget left" and rendering it as a destructive bar under "Budgets"
+  // reported ordinary unbudgeted spend as a budget overrun for anyone who
+  // hasn't set a budget yet. `availableMinor > 0` isn't the right guard
+  // either — that would silently drop a category that's genuinely carrying
+  // negative debt into this month.
+  const budgeted = (r: (typeof budgetRows)[number]) =>
+    r.budgetMinor !== 0 || r.carryMinor !== 0;
+  const budgetRemaining = budgetRows
+    .filter(budgeted)
+    .reduce((sum, r) => sum + r.remainingMinor, 0);
 
   return (
     <>
@@ -86,14 +99,10 @@ export default async function DashboardPage({
             </p>
             <ul className="space-y-3">
               {budgetRows
-                .filter((r) => r.availableMinor > 0 || r.spentMinor > 0)
+                .filter(budgeted)
                 .slice(0, 6)
                 .map((r) => {
                   const over = r.remainingMinor < 0;
-                  const pct =
-                    r.availableMinor > 0
-                      ? Math.min(100, (r.spentMinor / r.availableMinor) * 100)
-                      : 100;
                   return (
                     <li key={r.categoryId}>
                       <div className="flex justify-between mb-1">
@@ -106,12 +115,10 @@ export default async function DashboardPage({
                           {formatAmount(r.remainingMinor, currency)} left
                         </span>
                       </div>
-                      <div className="h-1.5 rounded-pill bg-muted overflow-hidden">
-                        <div
-                          className={over ? "h-full bg-destructive" : "h-full bg-foreground"}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
+                      <BudgetProgressBar
+                        spentMinor={r.spentMinor}
+                        availableMinor={r.availableMinor}
+                      />
                     </li>
                   );
                 })}

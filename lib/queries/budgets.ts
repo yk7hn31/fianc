@@ -59,10 +59,6 @@ export async function getBudgetMonth(
       .orderBy(asc(categories.name)),
   ]);
 
-  const earliest =
-    budgetRows.map((b) => b.month).sort()[0] ?? month;
-  const months = monthRange(earliest <= month ? earliest : month, month);
-
   return categoryRows
     .filter((c) => !c.archivedAt)
     .map((category) => {
@@ -77,6 +73,14 @@ export async function getBudgetMonth(
         .filter((r) => r.categoryId === category.id)
         .map((r) => ({ month: r.month, spentMinor: Number(r.spentMinor) }));
 
+      // The fold window is per category, built from that category's OWN
+      // earliest budget row — not the earliest budget row across every
+      // category the user has. Sharing one global window meant a category
+      // with no budget history yet still got an entry for every month
+      // another category happened to be budgeted in, and foldRollover reads
+      // a missing month as budget 0, so any spend in those months became
+      // debt carried into the category's first real rollover month.
+      const months = monthRange(b.map((r) => r.month).sort()[0] ?? month, month);
       const state = foldRollover(b, s, months).at(-1)!;
       return {
         categoryId: category.id,
