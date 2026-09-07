@@ -7,6 +7,19 @@ function groceriesRow(page: Page): Locator {
   return page.locator("main li").filter({ hasText: "Groceries" });
 }
 
+/**
+ * The month key the budgets page defaults to, and its neighbours.
+ *
+ * UTC, because that is what `monthKey(new Date())` in lib/budgets.ts uses to
+ * pick the default month — deriving it locally here would disagree with the
+ * page for the last hours of the month west of Greenwich.
+ */
+function monthOffset(n: number): string {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + n, 1));
+  return d.toISOString().slice(0, 7);
+}
+
 test("setting a budget shows spend against it", async ({ page }) => {
   await signUp(page);
   await addAccount(page, "Checking", "1000");
@@ -61,16 +74,46 @@ test("rollover carries a category's remaining balance into the next month", asyn
   await page.getByRole("link", { name: "Next month" }).click();
   await page.waitForURL(/month=/);
   const nextMonth = groceriesRow(page);
-  // Nothing has been budgeted for the new month yet, so there is no row to
-  // fold rollover into — the Amount input is uncontrolled and this row's
-  // component instance isn't remounted by the search-param-only navigation
-  // (same categoryId key), so it still holds the "100.00" typed a moment
-  // ago. Toggling the switch here re-affirms that same $100 budget for the
-  // new month with rollover on, which is what makes this month's own
-  // rollover flag true and lets last month's $60 fold forward into it —
-  // available = 100 (this month's own budget) + 60 (carried in) = 160.
-  await nextMonth.getByRole("switch").click();
+  // Nothing has been budgeted for the new month, and nothing needs to be:
+  // the fold inherits the rollover setting from the last month that had a
+  // budget row, so the $60 is already carried and the switch already reads
+  // as on. (It used to have to be toggled here, because a month with no row
+  // reset the carry to zero.)
   await expect(nextMonth.getByRole("switch")).toBeChecked();
-  await expect(nextMonth.getByText("$0.00 of $160.00")).toBeVisible();
   await expect(nextMonth.getByText(/\+\$60\.00 carried/)).toBeVisible();
+  await expect(nextMonth.getByText("$0.00 of $60.00")).toBeVisible();
+
+  // Budgeting the new month as well stacks its own $100 on top of the carry.
+  await nextMonth.getByLabel("Groceries budget").fill("100.00");
+  await nextMonth.getByLabel("Groceries budget").blur();
+  await expect(nextMonth.getByText("$0.00 of $160.00")).toBeVisible();
+});
+
+test("rollover survives a month that was never budgeted", async ({ page }) => {
+  await signUp(page);
+
+  // Budget this month with rollover on and spend nothing, so the whole
+  // $100.00 is unspent and should still be there two months later.
+  await page.goto("/budgets");
+  const first = groceriesRow(page);
+  await first.getByLabel("Groceries budget").fill("100.00");
+  await first.getByRole("switch").click();
+  await expect(first.getByRole("switch")).toBeChecked();
+  await expect(first.getByText("$0.00 of $100.00")).toBeVisible();
+
+  // Skip next month entirely — never opened, never budgeted, which is what
+  // happens whenever the user simply doesn't revisit the page. Jumping
+  // straight to month + 2 by URL rather than clicking "Next month" twice
+  // keeps the gap month genuinely untouched.
+  await page.goto(`/budgets?month=${monthOffset(2)}`);
+  const later = groceriesRow(page);
+  await expect(later.getByRole("switch")).toBeChecked();
+  await expect(later.getByText(/\+\$100\.00 carried/)).toBeVisible();
+  await expect(later.getByText("$0.00 of $100.00")).toBeVisible();
+
+  // And budgeting $100.00 here gives $200.00 available, not $100.00: the
+  // carry survived the unbudgeted month in between.
+  await later.getByLabel("Groceries budget").fill("100.00");
+  await later.getByLabel("Groceries budget").blur();
+  await expect(later.getByText("$0.00 of $200.00")).toBeVisible();
 });

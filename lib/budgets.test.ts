@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { monthKey, addMonths, monthRange, foldRollover } from "./budgets";
+import {
+  monthKey,
+  addMonths,
+  monthBounds,
+  monthRange,
+  foldRollover,
+} from "./budgets";
 
 describe("month helpers", () => {
   it("derives a month key from a date string", () => {
@@ -17,6 +23,23 @@ describe("month helpers", () => {
       "2026-01",
       "2026-02",
     ]);
+  });
+
+  it("bounds a 31-day month", () => {
+    expect(monthBounds("2026-01")).toEqual({ from: "2026-01-01", to: "2026-01-31" });
+  });
+
+  it("bounds a 30-day month", () => {
+    expect(monthBounds("2026-04")).toEqual({ from: "2026-04-01", to: "2026-04-30" });
+  });
+
+  it("bounds February in a common year and in a leap year", () => {
+    expect(monthBounds("2026-02").to).toBe("2026-02-28");
+    expect(monthBounds("2028-02").to).toBe("2028-02-29");
+  });
+
+  it("bounds December without rolling into the next year", () => {
+    expect(monthBounds("2026-12")).toEqual({ from: "2026-12-01", to: "2026-12-31" });
   });
 
   it("returns a single month when from equals to", () => {
@@ -60,6 +83,9 @@ describe("foldRollover", () => {
     expect(result[1]).toMatchObject({ carryMinor: -3000, availableMinor: 7000 });
   });
 
+  // The spec, verbatim: "Months with no budget row contribute budget = 0 but
+  // still carry." A budget row is only written when the user types an amount
+  // or copies last month, so an unbudgeted month is the ordinary case.
   it("carries across a month that has no budget row", () => {
     const result = foldRollover(
       [
@@ -69,10 +95,60 @@ describe("foldRollover", () => {
       [],
       months,
     );
-    // Jan leaves 10000; Feb has no row so it neither budgets nor carries…
-    expect(result[1]).toMatchObject({ budgetMinor: 0, carryMinor: 0, remainingMinor: 0 });
-    // …and March starts from February's remaining, not January's.
-    expect(result[2]).toMatchObject({ budgetMinor: 10000, carryMinor: 0 });
+    // Jan leaves 10000. Feb budgets nothing but still carries that 10000
+    // forward untouched…
+    expect(result[1]).toMatchObject({
+      budgetMinor: 0,
+      carryMinor: 10000,
+      availableMinor: 10000,
+      remainingMinor: 10000,
+      rollover: true,
+    });
+    // …so March's own 10000 sits on top of it.
+    expect(result[2]).toMatchObject({
+      budgetMinor: 10000,
+      carryMinor: 10000,
+      availableMinor: 20000,
+    });
+  });
+
+  it("spends from the carry in a month with no budget row", () => {
+    const result = foldRollover(
+      [{ month: "2026-01", amountMinor: 10000, rollover: true }],
+      [{ month: "2026-02", spentMinor: 4000 }],
+      monthRange("2026-01", "2026-03"),
+    );
+    expect(result[1]).toMatchObject({
+      budgetMinor: 0,
+      carryMinor: 10000,
+      spentMinor: 4000,
+      remainingMinor: 6000,
+    });
+    expect(result[2]).toMatchObject({ carryMinor: 6000, availableMinor: 6000 });
+  });
+
+  it("does not carry into a gap month before rollover was ever enabled", () => {
+    const result = foldRollover(
+      [{ month: "2026-01", amountMinor: 10000, rollover: false }],
+      [],
+      monthRange("2026-01", "2026-02"),
+    );
+    expect(result[1]).toMatchObject({ carryMinor: 0, rollover: false });
+  });
+
+  it("keeps rollover off through gap months after it is switched off", () => {
+    const result = foldRollover(
+      [
+        { month: "2026-01", amountMinor: 10000, rollover: true },
+        { month: "2026-02", amountMinor: 10000, rollover: false },
+      ],
+      [],
+      months,
+    );
+    // Feb turned it off explicitly; March and April have no row, so they
+    // inherit "off" and stay at zero rather than resurrecting Jan's balance.
+    expect(result[2]).toMatchObject({ carryMinor: 0, rollover: false });
+    expect(result[3]).toMatchObject({ carryMinor: 0, rollover: false });
   });
 
   it("stops carrying the month rollover is switched off", () => {

@@ -1,8 +1,16 @@
 import "server-only";
-import { and, asc, eq, lte, sql } from "drizzle-orm";
+import { asc, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { budgets, categories, transactions } from "@/lib/db/schema";
 import { foldRollover, monthRange, type BudgetRow, type SpendRow } from "@/lib/budgets";
+// The clauses live next door so they can be compiled and asserted without a
+// database; see the note at the top of that module for why the budget rows'
+// tenant scope in particular cannot be reached any other way.
+import {
+  budgetCategoriesWhere,
+  budgetRowsWhere,
+  budgetSpendWhere,
+} from "./budgets.where";
 
 export interface CategoryBudget {
   categoryId: string;
@@ -25,8 +33,6 @@ export async function getBudgetMonth(
   userId: string,
   month: string, // "YYYY-MM"
 ): Promise<CategoryBudget[]> {
-  const monthEnd = `${month}-01`;
-
   const [budgetRows, spendRows, categoryRows] = await Promise.all([
     db
       .select({
@@ -36,7 +42,7 @@ export async function getBudgetMonth(
         rollover: budgets.rollover,
       })
       .from(budgets)
-      .where(and(eq(budgets.userId, userId), lte(budgets.month, monthEnd))),
+      .where(budgetRowsWhere(userId, month)),
     db
       .select({
         categoryId: transactions.categoryId,
@@ -44,18 +50,12 @@ export async function getBudgetMonth(
         spentMinor: sql<number>`sum(${transactions.amountMinor})`,
       })
       .from(transactions)
-      .where(
-        and(
-          eq(transactions.userId, userId),
-          eq(transactions.type, "expense"),
-          sql`to_char(${transactions.date}, 'YYYY-MM') <= ${month}`,
-        ),
-      )
+      .where(budgetSpendWhere(userId, month))
       .groupBy(transactions.categoryId, sql`to_char(${transactions.date}, 'YYYY-MM')`),
     db
       .select()
       .from(categories)
-      .where(and(eq(categories.userId, userId), eq(categories.kind, "expense")))
+      .where(budgetCategoriesWhere(userId))
       .orderBy(asc(categories.name)),
   ]);
 
@@ -82,11 +82,16 @@ export async function getBudgetMonth(
       // debt carried into the category's first real rollover month.
       const months = monthRange(b.map((r) => r.month).sort()[0] ?? month, month);
       const state = foldRollover(b, s, months).at(-1)!;
+      // `rollover` comes from the fold, not from `b.find(r => r.month ===
+      // month)`: this month may have no budget row at all and still be
+      // carrying an earlier month's balance forward. Reading the missing row
+      // rendered the switch as off next to a visible "+$60.00 carried", and
+      // the next save from this row would have posted `rollover = false` and
+      // cut the chain the user could see on screen.
       return {
         categoryId: category.id,
         name: category.name,
         icon: category.icon,
-        rollover: b.find((r) => r.month === month)?.rollover ?? false,
         ...state,
       };
     });
