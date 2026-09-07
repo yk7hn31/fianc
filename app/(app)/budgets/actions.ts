@@ -34,7 +34,11 @@ export async function setBudget(formData: FormData): Promise<ActionResult> {
   const { categoryId, month, amount, rollover } = parsed.data;
   if (!(await ownsCategory(user.id, categoryId))) return fail("Category not found");
 
-  const money = parseAmount(amount === "" ? "0" : amount);
+  // `user.baseCurrency`, like every other parseAmount call site: without it
+  // this defaulted to USD's two decimals while the spend it is compared
+  // against was parsed with the user's real currency, so under a
+  // zero-decimal currency a budget came out 100x too large.
+  const money = parseAmount(amount === "" ? "0" : amount, user.baseCurrency);
   if (!money.ok) return fail(money.error);
 
   try {

@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { parseAmount, formatAmount, directionFor, minorUnitExponent } from "./money";
+import {
+  parseAmount,
+  formatAmount,
+  toAmountInput,
+  directionFor,
+  minorUnitExponent,
+} from "./money";
 
 describe("parseAmount", () => {
   it("parses whole numbers to minor units", () => {
@@ -124,5 +130,38 @@ describe("minorUnitExponent", () => {
 
   it("returns 3 for KWD", () => {
     expect(minorUnitExponent("KWD")).toBe(3);
+  });
+});
+
+describe("toAmountInput", () => {
+  it("renders USD minor units as a plain two-decimal string", () => {
+    expect(toAmountInput(123456, "USD")).toBe("1234.56");
+    expect(toAmountInput(5, "USD")).toBe("0.05");
+    expect(toAmountInput(0, "USD")).toBe("0.00");
+  });
+
+  it("renders a zero-decimal currency with no decimals at all", () => {
+    expect(toAmountInput(1000, "JPY")).toBe("1000");
+  });
+
+  it("renders a three-decimal currency with three", () => {
+    expect(toAmountInput(12345, "KWD")).toBe("12.345");
+  });
+
+  it("adds no grouping separator, which parseAmount would have to strip", () => {
+    expect(toAmountInput(123456789, "USD")).toBe("1234567.89");
+  });
+
+  // The property that matters: a prefilled edit field must come back out of
+  // parseAmount as the number that went in, whatever the currency. The old
+  // hardcoded `(minor / 100).toFixed(2)` broke this for every currency whose
+  // minor exponent is not 2.
+  it.each(["USD", "JPY", "KWD"])("round-trips through parseAmount (%s)", (currency) => {
+    for (const minor of [0, 1, 999, 100000]) {
+      expect(parseAmount(toAmountInput(minor, currency), currency)).toEqual({
+        ok: true,
+        value: minor,
+      });
+    }
   });
 });

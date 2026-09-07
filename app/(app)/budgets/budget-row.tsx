@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { CategoryIcon } from "@/components/category-icon";
 import { BudgetProgressBar } from "@/components/budget-progress-bar";
-import { formatAmount } from "@/lib/money";
+import { formatAmount, toAmountInput } from "@/lib/money";
 import { setBudget } from "./actions";
 import type { CategoryBudget } from "@/lib/queries/budgets";
 
@@ -77,7 +77,11 @@ export function BudgetRow({
         <Input
           ref={inputRef}
           aria-label={`${row.name} budget`}
-          defaultValue={row.budgetMinor ? (row.budgetMinor / 100).toFixed(2) : ""}
+          // `toAmountInput`, not `/ 100`: `setBudget` parses whatever comes
+          // back out of this input with the user's own currency, so a
+          // hardcoded two-decimal divisor here would round-trip a
+          // zero-decimal currency's budget out by 100x on every edit.
+          defaultValue={row.budgetMinor ? toAmountInput(row.budgetMinor, currency) : ""}
           placeholder="0.00"
           inputMode="decimal"
           disabled={amountPending}

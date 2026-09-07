@@ -45,6 +45,25 @@ export function parseAmount(input: string, currency = "USD"): ParseAmountResult 
   return { ok: true, value: minor };
 }
 
+/**
+ * Minor units as the plain, un-grouped string an amount `<input>` expects —
+ * the exact round trip of `parseAmount`, so `parseAmount(toAmountInput(m, c), c)`
+ * gives back `m`.
+ *
+ * Not `formatAmount`: that adds a currency symbol and thousands separators,
+ * which `parseAmount` would reject on the way back in. And not a hardcoded
+ * `(minor / 100).toFixed(2)`, which every prefilled edit field used to do:
+ * under a zero-decimal currency that renders 1000 minor units as "10.00",
+ * `parseAmount` reads it back as 1000 again only by accident of the divisor
+ * and the exponent agreeing — under JPY it becomes 1000 → "10.00" → rejected,
+ * and under a 3-decimal currency it silently corrupts by 10x. The exponent
+ * has to come from the same place both directions.
+ */
+export function toAmountInput(minor: number, currency = "USD"): string {
+  const exponent = minorUnitExponent(currency);
+  return (minor / Math.pow(10, exponent)).toFixed(exponent);
+}
+
 export function formatAmount(
   minor: number,
   currency = "USD",
