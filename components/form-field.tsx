@@ -2,12 +2,15 @@
 
 import {
   useActionState,
+  useEffect,
+  useRef,
   useState,
   type ComponentProps,
   type ReactNode,
 } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import type { ActionResult } from "@/lib/action-result";
 
 type FormAction = (
@@ -76,11 +79,22 @@ export function FieldShell({
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
+    /*
+      `.t-input-wrap` / `.is-error` are the transitions.dev error-state shake's
+      outer hooks — they own the message reveal. The shake itself lives on
+      `.t-input`, which `FormField` puts on the input it renders; a FieldShell
+      wrapping a Select or a tablist has no single bordered box to shake, and
+      a transform on a wrapper would become the containing block for anything
+      inside it that positions itself.
+    */
+    <div className={cn("t-input-wrap space-y-1.5", error && "is-error")}>
       <Label htmlFor={name}>{label}</Label>
       {children}
       {error && (
-        <p id={`${name}-error`} className="text-destructive text-caption">
+        <p
+          id={`${name}-error`}
+          className="t-error-msg text-destructive text-caption"
+        >
           {error}
         </p>
       )}
@@ -92,22 +106,65 @@ export function FormField({
   label,
   name,
   error,
+  className,
   ...props
 }: {
   label: string;
   name: string;
   error?: string;
 } & Omit<ComponentProps<typeof Input>, "name">) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  /*
+   * Replay the shake whenever this field is newly rejected. The class has to
+   * come off, the layout has to be read back, and only then can it go on
+   * again — re-adding a class that is already there is not a state change, so
+   * without the reflow the animation would run once and never again.
+   *
+   * The trigger is the error *value* changing, which covers the two cases
+   * that matter: a clean field being rejected, and a rejected field being
+   * rejected for a new reason. Submitting the same wrong value twice reports
+   * the same string both times and shakes once — an action result carries no
+   * attempt counter to distinguish the second submit from a re-render.
+   */
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !error) return;
+
+    el.classList.remove("is-shaking");
+    void el.offsetWidth; // force reflow
+    el.classList.add("is-shaking");
+
+    const cs = getComputedStyle(document.documentElement);
+    const ms = (name: string, fallback: number) => {
+      const v = parseFloat(cs.getPropertyValue(name));
+      return Number.isFinite(v) ? v : fallback;
+    };
+    const shakeMs = ms("--shake-dur-a", 80) * 2 + ms("--shake-dur-b", 60) * 2;
+
+    const timer = setTimeout(
+      () => el.classList.remove("is-shaking"),
+      shakeMs + 20,
+    );
+    return () => {
+      clearTimeout(timer);
+      el.classList.remove("is-shaking");
+    };
+  }, [error]);
+
   return (
     <FieldShell label={label} name={name} error={error}>
       <Input
+        ref={ref}
         id={name}
         name={name}
         aria-invalid={Boolean(error)}
         // Without this a screen reader announces the field as invalid but
         // never reads why — the reason sits in a sibling paragraph.
         aria-describedby={error ? `${name}-error` : undefined}
-        className="h-11"
+        // `.t-input` owns the shake and the border-color tween; `.is-error`
+        // switches that tween to the slower clock the message fades on.
+        className={cn("t-input h-11", error && "is-error", className)}
         {...props}
       />
     </FieldShell>

@@ -1,9 +1,10 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { deleteTransactions } from "./actions";
 
 export function SelectionBar({
@@ -14,10 +15,41 @@ export function SelectionBar({
   onCleared: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  /*
+   * The transitions.dev toast: the bar rises from below with a fade, a slight
+   * scale and a cross-blur as soon as a row is ticked.
+   *
+   * `.is-open` is added a frame after mount rather than on the first render.
+   * A transition needs two painted states to tween between, and an element
+   * that has never been laid out in its closed state has only one — the
+   * browser would resolve straight to the open values and nothing would move.
+   *
+   * The bar still unmounts the moment the selection empties: no exit clock.
+   * Clearing a selection is usually the prelude to picking a different one,
+   * and a bar that lingered a third of a second would be sliding out under
+   * the row the user is already reaching for.
+   */
+  const [open, setOpen] = useState(false);
+  const anySelected = selected.length > 0;
+
+  useEffect(() => {
+    if (!anySelected) {
+      setOpen(false);
+      return;
+    }
+    const frame = requestAnimationFrame(() => setOpen(true));
+    return () => cancelAnimationFrame(frame);
+  }, [anySelected]);
+
   if (selected.length === 0) return null;
 
   return (
-    <div className="mb-3 flex items-center justify-between gap-3 rounded-card border border-border bg-card p-3 shadow-card">
+    <div
+      className={cn(
+        "t-toast mb-3 flex items-center justify-between gap-3 rounded-card border border-border bg-card p-3 shadow-card",
+        open && "is-open",
+      )}
+    >
       <span>{selected.length} selected</span>
       <Button
         variant="destructive"
