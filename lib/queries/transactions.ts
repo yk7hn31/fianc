@@ -29,27 +29,29 @@ export async function listTransactions(
 ): Promise<{ rows: TxRow[]; total: number }> {
   const clause = buildTxWhere(userId, f);
 
-  const rows = await db
-    .select({
-      tx: transactions,
-      categoryName: categories.name,
-      categoryIcon: categories.icon,
-      accountName: accounts.name,
-    })
-    .from(transactions)
-    .innerJoin(accounts, eq(accounts.id, transactions.accountId))
-    // Left, not inner: a transaction may be uncategorised, and both halves of
-    // a transfer always are.
-    .leftJoin(categories, eq(categories.id, transactions.categoryId))
-    .where(clause)
-    .orderBy(...buildTxOrder(f))
-    .limit(f.pageSize)
-    .offset(pageOffset(f));
-
-  const [{ value: total }] = await db
-    .select({ value: count() })
-    .from(transactions)
-    .where(clause);
+  // Both queries at once. They share only `clause` and neither reads the
+  // other's result, so awaiting them in sequence spent two round trips to
+  // the database on the critical path of every transactions render — and
+  // this page is also the slowest tab to switch to.
+  const [rows, [{ value: total }]] = await Promise.all([
+    db
+      .select({
+        tx: transactions,
+        categoryName: categories.name,
+        categoryIcon: categories.icon,
+        accountName: accounts.name,
+      })
+      .from(transactions)
+      .innerJoin(accounts, eq(accounts.id, transactions.accountId))
+      // Left, not inner: a transaction may be uncategorised, and both halves
+      // of a transfer always are.
+      .leftJoin(categories, eq(categories.id, transactions.categoryId))
+      .where(clause)
+      .orderBy(...buildTxOrder(f))
+      .limit(f.pageSize)
+      .offset(pageOffset(f)),
+    db.select({ value: count() }).from(transactions).where(clause),
+  ]);
 
   return {
     rows: rows.map((r) => ({
