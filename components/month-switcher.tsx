@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { addMonths } from "@/lib/budgets";
 import { buttonVariants } from "@/components/ui/button";
+import { MonthLabel } from "@/components/month-label";
 import { cn } from "@/lib/utils";
 
 export function MonthSwitcher({
@@ -36,7 +37,7 @@ export function MonthSwitcher({
       >
         <ChevronLeft className="size-4" strokeWidth={1.5} />
       </Link>
-      <span className="min-w-40 text-center">{label}</span>
+      <MonthLabel label={label} className="min-w-40 text-center" />
       <Link
         href={`${basePath}?month=${addMonths(month, 1)}`}
         aria-label="Next month"

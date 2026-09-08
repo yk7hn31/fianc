@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* The transitions.dev motion layer: the shared motion-token scale plus the
+   `t-*` snippets this app installs. Imported last so its unlayered rules sit
+   above Tailwind's utility layer, which is what the snippets assume. */
+@import "./transitions.css";
 
 /* Redirect Tailwind's `dark:` variant to require an explicit `.dark` class
    (shadcn's default). The app never applies `.dark`, so every `dark:` utility

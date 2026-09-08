@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 /**
  * The spend-vs-available bar shared by the budgets list and the dashboard's
  * compact budgets card. Pulled out because the two call sites had each grown
@@ -23,8 +25,18 @@ export function BudgetProgressBar({
 
   return (
     <div className="h-1.5 rounded-pill bg-muted overflow-hidden">
+      {/*
+        `.t-resize` tweens the fill between two percentages instead of
+        snapping. The width is server-rendered, so this reads as motion
+        exactly where it should: saving a budget amount, or toggling
+        rollover, revalidates the row and the bar travels to its new
+        length rather than teleporting under the number that caused it.
+      */}
       <div
-        className={over ? "h-full bg-destructive" : "h-full bg-foreground"}
+        className={cn(
+          "t-resize h-full",
+          over ? "bg-destructive" : "bg-foreground",
+        )}
         style={{ width: `${pct}%` }}
       />
     </div>
