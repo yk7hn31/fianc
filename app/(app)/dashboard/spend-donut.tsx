@@ -1,48 +1,34 @@
 "use client";
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { formatAmount } from "@/lib/money";
+import dynamic from "next/dynamic";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// Monochrome ramp: DESIGN.md forbids chromatic decoration.
-const SHADES = ["#0a0a0a", "#3f3f3f", "#5c5c5c", "#737373", "#9a9a9a", "#c4c4c4"];
+/**
+ * recharts is the single heaviest thing the app downloads — most of the
+ * dashboard route's ~98 kB — and the donut is one card below the fold on a
+ * phone. Loading it on its own chunk keeps it off the critical path of the
+ * dashboard tab: the stats, budgets and Recent list render and respond while
+ * the chart is still arriving.
+ *
+ * `ssr: false` as well, so the chart's several hundred SVG nodes stay out of
+ * the streamed payload too. The placeholder holds the same h-56 the chart
+ * occupies, so nothing below it moves when it lands.
+ */
+const SpendDonutChart = dynamic(
+  () => import("./spend-donut-chart").then((m) => m.SpendDonutChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-56 items-center justify-center">
+        <Skeleton className="size-40 rounded-full" />
+      </div>
+    ),
+  },
+);
 
-export function SpendDonut({
-  data,
-  currency,
-}: {
+export function SpendDonut(props: {
   data: { name: string; spentMinor: number }[];
   currency: string;
 }) {
-  if (data.length === 0) {
-    return <p className="text-muted-foreground">No spending this month.</p>;
-  }
-
-  return (
-    <div className="h-56">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            dataKey="spentMinor"
-            nameKey="name"
-            innerRadius="60%"
-            outerRadius="90%"
-            stroke="none"
-          >
-            {data.map((_, i) => (
-              <Cell key={i} fill={SHADES[i % SHADES.length]} />
-            ))}
-          </Pie>
-          <Tooltip
-            formatter={(v) => formatAmount(Number(v), currency)}
-            contentStyle={{
-              borderRadius: 18,
-              border: "1px solid #e5e5e5",
-              fontSize: 14,
-            }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
-  );
+  return <SpendDonutChart {...props} />;
 }
